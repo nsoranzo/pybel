@@ -51,26 +51,6 @@ class Mapper:
                 for entry in entries:
                     uniprot_id, reference, reference_id = entry.decode('utf-8').strip().split("\t")
                     insert_values.append({'uniprot':uniprot_id, 'reference':reference, 'xref':reference_id})
-                    
-#                     if uniprot_id in uniprot_dict and reference in uniprot_dict[uniprot_id]:
-#                         if reference_id not in uniprot_dict[uniprot_id][reference]:
-#                             uniprot_dict[uniprot_id][reference].append(reference_id)
-#                     
-#                     elif uniprot_id in uniprot_dict:
-#                         uniprot_dict[uniprot_id][reference] = [reference_id]
-#                     
-#                     else:
-#                         uniprot_dict[uniprot_id] = {reference:[reference_id]}
-#                         
-#                     if reference in self.map_dict and reference_id in self.map_dict[reference]:
-#                         if uniprot_id not in self.map_dict[reference][reference_id]['uniprot']:
-#                             self.map_dict[reference][reference_id]['uniprot'].append(uniprot_id)
-#                     
-#                     elif reference in self.map_dict:
-#                         self.map_dict[reference][reference_id] ={'uniprot':[uniprot_id]}
-#                     
-#                     else:
-#                         self.map_dict[reference] = {reference_id:{'uniprot':[uniprot_id]}}
                 
                 print("[INFO] Done creating value_dict_list ({runtime:3.2f}s)".format(runtime=(time.time()-tmp_time)))
                 tmp_time = time.time()
@@ -138,17 +118,4 @@ class Mapper:
         Get map for name in source_namespace to target_namespace.
         """
         pass
-    
-    
-if __name__ == '__main__':
-#     connection_string = 'mysql+pymysql://root:motale2@localhost/pybel'
-    connection_string = 'sqlite:///pybel.db'
-    mapper = Mapper(connection_string)
-#     mapper.create_tables()
-#     mapper.insert_mapping()
-
-    md = mapper.create_namespace_map('HGNC')
-    print(md)
-#     print(type(md[0]))
-    #print(mapper.get_namespace_map())
     
