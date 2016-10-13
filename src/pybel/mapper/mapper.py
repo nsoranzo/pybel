@@ -15,23 +15,23 @@ class Mapper:
         :param: connection_string: Database connection.
         :param: sql_echo: Shows SQL queries on console if True.
         """
-        self.db_engine = create_engine(connection_string,echo=sql_echo)
-        self.db_session = scoped_session(sessionmaker(bind=self.db_engine,autoflush=False,expire_on_commit=False))
+        self.__db_engine = create_engine(connection_string,echo=sql_echo)
+        self.__db_session = scoped_session(sessionmaker(bind=self.__db_engine,autoflush=False,expire_on_commit=False))
     
     def create_tables(self):
         """
         Creates empty tables for mapping in given database (connection_string).
         :note: Existing tables will be droped!
         """
-        database_models.Base.metadata.drop_all(self.db_engine)
-        database_models.Base.metadata.create_all(self.db_engine)
+        database_models.Base.metadata.drop_all(self.__db_engine)
+        database_models.Base.metadata.create_all(self.__db_engine)
         
     
-    def insert_mapping(self):
+    def insert_mapping(self, source_dict=default_namespaces):
         """
         Populates database with data (connection_string). Sources are defined in defaults.py
         """
-        for namespace, source_url in default_namespaces.items():
+        for namespace, source_url in source_dict.items():
             start_time = time.time()
             print("[INFO] Start parsing '{}'".format(namespace))
             tmp_file, headers = urllib.request.urlretrieve(source_url)
@@ -51,32 +51,28 @@ class Mapper:
                 
                 for entry in entries:
                     uniprot_id, reference, reference_id = entry.decode('utf-8').strip().split("\t")
+                    reference_id = reference_id.lower() if reference == 'Gene_Name' else reference_id
                     insert_values.append({'uniprot':uniprot_id, 'reference':reference, 'xref':reference_id})
                 
                 print("[INFO] Done creating value_dict_list ({runtime:3.2f}s)".format(runtime=(time.time()-tmp_time)))
                 tmp_time = time.time()
                 
-                self.db_session.bulk_insert_mappings(database_models.Uniprot_Map,insert_values)
-                self.db_session.commit()
-                
-                print("[INFO] Done bulk_insert ({runtime:3.2f}s)".format(runtime=(time.time()-tmp_time)))
+                self.__db_engine.execute(database_models.Uniprot_Map.__table__.insert(),insert_values)
+
+                print("[INFO] Done insert ({runtime:3.2f}s)".format(runtime=(time.time()-tmp_time)))
                 tmp_time = time.time()
-                
-            elif source_url.endswith('.json'):
-                pass
             
-            print("[INFO] Done parsing '{ns}'. \n[RUNTIME] {runtime:3.2f}s".format(ns=namespace,runtime=(time.time()-start_time)))
-                
-        
-    def create_uniprot_namespace_map(self, namespace):
+            print("[INFO] Done parsing '{ns}'. \n[RUNTIME] {runtime:3.2f}s".format(ns=namespace,runtime=(time.time()-start_time)))      
+                  
+    def create_namespace_map(self, namespace):
         """
         :param: namespace: Identifier for namespaces that should be mapped to. Use get_namespace_list() to get a list of available namespaces.
+        :param: nested_map: Flag for a nested namespace mapping dict like: dict[Namespace][Namespace_id][other_Namespace]
         
-        Creates a dictionary of sets that contains mapping for uniprot identifiers. i.e. {uniprot_id:{namespace_id, set, ...}}
         """
         start_time = time.time()
         uniprot_orm = database_models.Uniprot_Map
-        mapping_data = self.db_session.query(uniprot_orm).filter_by(reference=namespace).all()
+        mapping_data = self.__db_session.query(uniprot_orm).filter_by(reference=namespace).all()
         
         uniprot_dict = {}
         namespace_dict = {}
@@ -85,7 +81,7 @@ class Mapper:
             uniprot_id = entry.uniprot
             ref = entry.reference
             reference_id = entry.xref
-              
+            
             if uniprot_id in uniprot_dict:
                 uniprot_dict[uniprot_id].add(reference_id)
              
@@ -94,7 +90,7 @@ class Mapper:
             
             if reference_id in namespace_dict:
                 namespace_dict[reference_id].add(uniprot_id)
-                 
+                    
             else:
                 namespace_dict[reference_id] = set([uniprot_id])
                 
@@ -105,10 +101,10 @@ class Mapper:
         
         return result_dict
     
-    def create_map(self):
+    def create_complete_map(self):
         """
         Creates mapping dictionary. i.e. {namespace_A: {namespace_A:{Identifier:{uniprot, id, set, ...}}, 'UniProt':{Identifier:{namespace, id, set, ...}, ...}}, ...}
-        To access uniprot identifiers in namespace 'HGNC' for 'HGNC:620' (APP) use: map_dict['HGNC']['HGNC']['HGNC:620']
+        To access uniprot identifiers in namespace 'HGNC' for 'HGNC:620' (APP) use: map_dict['HGNC']['HGNC:620']
         """
         start_time = time.time()
         tmp_map_dict = {}
@@ -116,7 +112,7 @@ class Mapper:
         uniprot_dict = {}
         
         for namespace in self.get_namespace_list():
-            tmp_map_dict = self.create_uniprot_namespace_map(namespace)
+            tmp_map_dict = self.create_namespace_map(namespace)
             
             for uni_id in tmp_map_dict['UniProt']:
                 if uni_id in uniprot_dict and namespace in uniprot_dict[uni_id]:
@@ -128,9 +124,8 @@ class Mapper:
 
             del(tmp_map_dict['UniProt'])
             map_dict.update(tmp_map_dict)
-            
-        map_dict['UniProt'] = uniprot_dict          
         
+        map_dict['UniProt'] = uniprot_dict  
         print('[INFO] Created mapping dictionary ({runtime:3.2f}s)'.format(runtime=(time.time()-start_time)))
         
         return map_dict
@@ -141,7 +136,7 @@ class Mapper:
         
         :return: List of namespaces available in database.
         """
-        namespaces_nested = self.db_session.query(database_models.Uniprot_Map.reference).distinct().all()
+        namespaces_nested = self.__db_engine.query(database_models.Uniprot_Map.reference).distinct().all()
         return [namespace for namespaces_listed in namespaces_nested for namespace in namespaces_listed]
     
     def map(self, source_namespace, identifier, target_namespace, use_uniprot_api=False):
@@ -158,12 +153,11 @@ class Mapper:
         start_time = time.time()
         uniprot_orm = database_models.Uniprot_Map
         
-        uniprot_nested = self.db_session.query(uniprot_orm.uniprot).filter_by(reference=source_namespace,xref=identifier).all()
+        uniprot_nested = self.__db_session.query(uniprot_orm.uniprot).filter_by(reference=source_namespace,xref=identifier).all()
         
         uniprot_ids = [uniprot_id for listed in uniprot_nested for uniprot_id in listed]
         
-        
-        desired_targets = self.db_session.query(uniprot_orm.xref).filter_by(reference=target_namespace).filter(uniprot_orm.uniprot.in_(uniprot_ids)).all()
+        desired_targets = self.__db_session.query(uniprot_orm.xref).filter_by(reference=target_namespace).filter(uniprot_orm.uniprot.in_(uniprot_ids)).all()
 
         print("[INFO] Mapped '{entity_name}' from '{source_name}' to '{target_name}' ({runtime:3.2f}s)".format(entity_name=identifier,
                                                                                                                source_name=source_namespace,

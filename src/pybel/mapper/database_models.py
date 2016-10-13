@@ -5,7 +5,7 @@ from sqlalchemy.orm import relationship
 Base = declarative_base()
 
 class Uniprot_Map(Base):
-    __tablename__ = 'map_root'
+    __tablename__ = 'pybelmap_root'
     
     id = Column(Integer, primary_key=True)
     uniprot = Column(String(255))
@@ -13,9 +13,10 @@ class Uniprot_Map(Base):
     xref = Column(String(255))
     
 class Resolution(Base):
-     __tablename__ = 'map_resolution'
+     __tablename__ = 'pybelmap_resolution'
      
      id = Column(Integer, primary_key=True)
      namespace = Column(String(255))
+     namespaceID = Column(String(255))
      symbol = Column(String(255))
      
