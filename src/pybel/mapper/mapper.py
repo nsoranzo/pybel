@@ -1,6 +1,12 @@
-import database_models, urllib.request, gzip, time
+import database_models, urllib.request, gzip, time, re
 
-from defaults import default_namespaces
+import pandas as pd
+
+from defaults import default_mapping, default_namespaces
+
+from configparser import ConfigParser
+
+from datetime import datetime
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
@@ -17,58 +23,122 @@ class Mapper:
         """
         self.__db_engine = create_engine(connection_string,echo=sql_echo)
         self.__db_session = scoped_session(sessionmaker(bind=self.__db_engine,autoflush=False,expire_on_commit=False))
+        self.__ns_delimiters = "=", "|", ":"
     
-    def create_tables(self):
+    def create_tables(self, tables=[]):
         """
         Creates empty tables for mapping in given database (connection_string).
         :note: Existing tables will be droped!
         """
-        database_models.Base.metadata.drop_all(self.__db_engine)
-        database_models.Base.metadata.create_all(self.__db_engine)
         
-    
-    def insert_mapping(self, source_dict=default_namespaces):
-        """
+        if len(tables) == 0:
+            database_models.Base.metadata.drop_all(self.__db_engine)
+            database_models.Base.metadata.create_all(self.__db_engine)
+        
+    def insert_mapping(self):
+        """        
         Populates database with data (connection_string). Sources are defined in defaults.py
         """
-        for namespace, source_url in source_dict.items():
-            start_time = time.time()
-            print("[INFO] Start parsing '{}'".format(namespace))
-            tmp_file, headers = urllib.request.urlretrieve(source_url)
-            print("[INFO] Download ({download_time:3.2f}s)".format(download_time=(time.time()-start_time)))
-            tmp_time = time.time()
-            
-            if source_url.endswith('.dat.gz'):
-                decompressed_file = gzip.open(tmp_file)
-                entries = decompressed_file.readlines()
-                
-                #TODO: Check if source is uniprot!
-                uniprot_dict = {}
-                
-                insert_values = []
-                
-                print("[INFO] Number of rows: {}".format(len(entries)))
-                
-                for entry in entries:
-                    uniprot_id, reference, reference_id = entry.decode('utf-8').strip().split("\t")
-                    reference_id = reference_id.lower() if reference == 'Gene_Name' else reference_id
-                    insert_values.append({'uniprot':uniprot_id, 'reference':reference, 'xref':reference_id})
-                
-                print("[INFO] Done creating value_dict_list ({runtime:3.2f}s)".format(runtime=(time.time()-tmp_time)))
-                tmp_time = time.time()
-                
-                self.__db_engine.execute(database_models.Uniprot_Map.__table__.insert(),insert_values)
-
-                print("[INFO] Done insert ({runtime:3.2f}s)".format(runtime=(time.time()-tmp_time)))
-                tmp_time = time.time()
-            
-            print("[INFO] Done parsing '{ns}'. \n[RUNTIME] {runtime:3.2f}s".format(ns=namespace,runtime=(time.time()-start_time)))      
-                  
-    def create_namespace_map(self, namespace):
-        """
-        :param: namespace: Identifier for namespaces that should be mapped to. Use get_namespace_list() to get a list of available namespaces.
-        :param: nested_map: Flag for a nested namespace mapping dict like: dict[Namespace][Namespace_id][other_Namespace]
         
+        source_dict = default_mapping
+        
+        if isinstance(source_dict, dict):
+            for namespace, source_url in source_dict.items():
+                start_time = time.time()
+                print("[INFO] Start parsing '{}'".format(namespace))
+                tmp_file, headers = urllib.request.urlretrieve(source_url)
+                print("[INFO] Download ({download_time:3.2f}s)".format(download_time=(time.time()-start_time)))
+                tmp_time = time.time()
+                
+                if namespace.startswith('mapping_'):
+                    decompressed_file = gzip.open(tmp_file)
+                    entries = decompressed_file.readlines()
+    
+                    uniprot_dict = {}
+                    insert_values = []
+                    
+                    print("[INFO] Number of rows: {numberOfRows}".format(numberOfRows=len(entries)))
+                    
+                    for entry in entries:
+                        
+                        # TODO: Replace this with Pandas DataFrame!!!!
+                        uniprot_id, reference, reference_id = entry.decode('utf-8').strip().split("\t")
+                        reference_id = reference_id.lower() if reference == 'Gene_Name' else reference_id
+                        insert_values.append({'uniprot':uniprot_id, 'reference':reference, 'xref':reference_id})
+                    
+                    print("[INFO] Done creating value_dict_list ({runtime:3.2f}s)".format(runtime=(time.time()-tmp_time)))
+                    tmp_time = time.time()
+                    
+                    self.__db_engine.execute(database_models.Uniprot_Map.__table__.insert(),insert_values)
+    
+                    print("[INFO] Done insert ({runtime:3.2f}s)".format(runtime=(time.time()-tmp_time)))
+                    tmp_time = time.time()
+                
+            print("[INFO] Done parsing '{ns}'. \n[RUNTIME] {runtime:3.2f}s".format(ns=namespace,runtime=(time.time()-start_time)))      
+     
+    def insert_latest_bel_namespaces(self, namespaces = default_namespaces):
+        """
+        Inserts the latest release of BEL-Namespaces into database. 
+        See: http://resource.belframework.org/belframework/latest-release/namespace/
+        """
+        start_time = time.time()
+        namespace_cache_dict = {}
+        
+        namespace_model = database_models.Namespace
+        namespace_url = namespaces['url']
+        
+        for namespace in namespaces['namespace']:
+            tmp_time = time.time()
+            namespace_insert_values = []
+            name_insert_values = []
+
+            tmp_file, headers = urllib.request.urlretrieve("{}{}".format(namespace_url,namespace))
+            
+            config = ConfigParser(delimiters=self.__ns_delimiters, strict=False)
+            config.optionxform = lambda option: option
+            config.read_file(open(tmp_file))
+            
+            namespace_key = config['Namespace']['Keyword']
+            
+            namespace_insert_values = [{'url':url,
+                                        'author':config['Author']['NameString'],
+                                        'keyword':namespace_key,
+                                        'pubDate':datetime.strptime(config['Citation']['PublishedDate'],'%Y-%m-%d') if 'PublishedDate' in config['Citation'] else None,
+                                        'copyright':config['Author']['CopyrightString'],
+                                        'version':int(config['Namespace']['VersionString']),
+                                        'contact':config['Author']['ContactInfoString']}]
+                        
+            namespace_entry = self.__db_engine.execute(namespace_model.__table__.insert(),namespace_insert_values)
+            namespace_pk = namespace_entry.inserted_primary_key[0]
+            
+            names_dict = dict(config['Values'])
+            namespace_cache_dict[namespace_key] = dict(config['Values'])
+            
+            name_insert_values = [{'namespace_id':namespace_pk,'name':name_info[0],'encoding':name_info[1]} for name_info in names_dict.items()]
+            
+            self.__db_engine.execute(database_models.Namespace_Name.__table__.insert(),name_insert_values)
+            
+            print("[INFO] Done parsing {ns_key} ({runtime:3.2f}s)".format(ns_key=namespace_key,runtime=(time.time()-tmp_time)))
+            
+        print("[INFO] Done ({runtime:3.2f}s)".format(runtime=(time.time()-start_time)))
+        
+        return namespace_cache_dict             
+
+    def update_bel_namespace(self, url):
+        start_time = time.time()
+        namespace_cache_dict = {}
+        
+        namespace_model = database_models.Namespace
+        tmp_file, headers = urllib.request.urlretrieve(url)
+        
+        config = ConfigParser(delimiters=self.__ns_delimiters, strict=False)
+        config.optionxform = lambda option: option
+        config.read_file(open(tmp_file))
+
+    def create_namespace_uniprot_map(self, namespace):
+        """
+        Creates mapping dictionary. i.e.: {Namespace:{Namespace_id:{set, uniprot_ids}, UniProt:{UniProt_id:{set, namespace_ids}}
+        :param: namespace: Identifier for namespaces that should be mapped to. Use get_namespace_list() to get a list of available namespaces.
         """
         start_time = time.time()
         uniprot_orm = database_models.Uniprot_Map
@@ -100,7 +170,14 @@ class Mapper:
         print('[INFO] Map for "{mapped_namespace}" created ({runtime:3.2f}s)'.format(mapped_namespace=namespace,runtime=(time.time()-start_time)))
         
         return result_dict
-    
+        
+    def create_namespace_namespace_map(self, namespaceA, namespaceB):
+        """
+        Creates a dictionary that maps from namespaceA to namespaceB. i.e.: {NamespaceA:{NamespaceA_id:{set, namespaceB_ids},NamespaceB:{NamespaceB_id:{set, namespaceA_ids}}
+        """
+        # TODO get this done!
+        uniprot_map_dataframe = pd.read_sql_table('pybelmap_root', self.__db_engine)
+          
     def create_complete_map(self):
         """
         Creates mapping dictionary. i.e. {namespace_A: {namespace_A:{Identifier:{uniprot, id, set, ...}}, 'UniProt':{Identifier:{namespace, id, set, ...}, ...}}, ...}
@@ -130,15 +207,6 @@ class Mapper:
         
         return map_dict
     
-    def get_namespace_list(self):
-        """
-        Returns a list of all mapped to namespaces.
-        
-        :return: List of namespaces available in database.
-        """
-        namespaces_nested = self.__db_engine.query(database_models.Uniprot_Map.reference).distinct().all()
-        return [namespace for namespaces_listed in namespaces_nested for namespace in namespaces_listed]
-    
     def map(self, source_namespace, identifier, target_namespace, use_uniprot_api=False):
         """
         :param: source_namespace: Namespace name is valid in.
@@ -165,3 +233,39 @@ class Mapper:
                                                                                                                runtime=(time.time()-start_time)))
         
         return [target_id for listed in desired_targets for target_id in listed]
+    
+    def get_mapped_namespace_list(self):
+        """
+        Returns a list of all mapped to namespaces.
+        
+        :return: List of namespaces available in database.
+        """
+        namespaces_nested = self.__db_session.query(database_models.Uniprot_Map.reference).distinct().all()
+        return [namespace for namespaces_listed in namespaces_nested for namespace in namespaces_listed]
+    
+    def get_cached_namespace_list(self):
+        """
+        Returns a list of all cached namespaces.
+        
+        :return: List of namespaces cached in database.
+        """
+        namespaces_nested = self.__db_session.query(database_models.Namespace.keyword).distinct().all()
+        return [namespace for namespaces_listed in namespaces_nested for namespace in namespaces_listed]
+    
+    def get_cached_namespaces(self):
+        """
+        Returns the cached namespaces as dictionary.
+        """
+        start_time = time.time()
+        
+        namespace_dataframe = pd.read_sql_table('pybelmap_namespace',self.__db_engine)
+        name_dataframe = pd.read_sql_table('pybelmap_name', self.__db_engine)
+        namespaces_names_dataframe = namespace_dataframe.merge(name_dataframe, left_on='id', right_on='namespace_id', how='inner')
+        grouped_dataframe = namespaces_names_dataframe[['keyword','name']].groupby("keyword")
+        
+        cached_namespace_dict = {keyword: group["name"].tolist() for keyword,group in grouped_dataframe}
+        
+        print("[INFO] Done creating cached_namespaces_dict ({runtime:3.2f}s)".format(runtime=(time.time()-start_time)))
+        
+        return cached_namespace_dict
+    
