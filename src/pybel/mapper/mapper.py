@@ -23,7 +23,8 @@ class Mapper:
         """
         self.__db_engine = create_engine(connection_string,echo=sql_echo)
         self.__db_session = scoped_session(sessionmaker(bind=self.__db_engine,autoflush=False,expire_on_commit=False))
-        self.__ns_delimiters = "=", "|", ":"
+        
+        self.namespace_cache_dict = {}
     
     def create_tables(self, tables=[]):
         """
@@ -63,7 +64,6 @@ class Mapper:
                         
                         # TODO: Replace this with Pandas DataFrame!!!!
                         uniprot_id, reference, reference_id = entry.decode('utf-8').strip().split("\t")
-                        reference_id = reference_id.lower() if reference == 'Gene_Name' else reference_id
                         insert_values.append({'uniprot':uniprot_id, 'reference':reference, 'xref':reference_id})
                     
                     print("[INFO] Done creating value_dict_list ({runtime:3.2f}s)".format(runtime=(time.time()-tmp_time)))
@@ -82,59 +82,83 @@ class Mapper:
         See: http://resource.belframework.org/belframework/latest-release/namespace/
         """
         start_time = time.time()
-        namespace_cache_dict = {}
         
         namespace_model = database_models.Namespace
         namespace_url = namespaces['url']
         
-        for namespace in namespaces['namespace']:
-            tmp_time = time.time()
-            namespace_insert_values = []
-            name_insert_values = []
-
-            tmp_file, headers = urllib.request.urlretrieve("{}{}".format(namespace_url,namespace))
-            
-            config = ConfigParser(delimiters=self.__ns_delimiters, strict=False)
-            config.optionxform = lambda option: option
-            config.read_file(open(tmp_file))
-            
-            namespace_key = config['Namespace']['Keyword']
-            
-            namespace_insert_values = [{'url':url,
-                                        'author':config['Author']['NameString'],
-                                        'keyword':namespace_key,
-                                        'pubDate':datetime.strptime(config['Citation']['PublishedDate'],'%Y-%m-%d') if 'PublishedDate' in config['Citation'] else None,
-                                        'copyright':config['Author']['CopyrightString'],
-                                        'version':int(config['Namespace']['VersionString']),
-                                        'contact':config['Author']['ContactInfoString']}]
-                        
-            namespace_entry = self.__db_engine.execute(namespace_model.__table__.insert(),namespace_insert_values)
-            namespace_pk = namespace_entry.inserted_primary_key[0]
-            
-            names_dict = dict(config['Values'])
-            namespace_cache_dict[namespace_key] = dict(config['Values'])
-            
-            name_insert_values = [{'namespace_id':namespace_pk,'name':name_info[0],'encoding':name_info[1]} for name_info in names_dict.items()]
-            
-            self.__db_engine.execute(database_models.Namespace_Name.__table__.insert(),name_insert_values)
-            
-            print("[INFO] Done parsing {ns_key} ({runtime:3.2f}s)".format(ns_key=namespace_key,runtime=(time.time()-tmp_time)))
-            
-        print("[INFO] Done ({runtime:3.2f}s)".format(runtime=(time.time()-start_time)))
+        namespace_cache_dict = {}
         
-        return namespace_cache_dict             
+        for namespace in namespaces['namespaces']:
+            self.__insert_bel_namespace("{}{}".format(namespace_url,namespace))
+            
+        print("[INFO] Done ({runtime:3.2f}s)".format(runtime=(time.time()-start_time)))           
 
     def update_bel_namespace(self, url):
+        """
+        Checks if a namespace that is given by url is already in namespace cache and if so, if it is up to date.
+        """
         start_time = time.time()
         namespace_cache_dict = {}
         
-        namespace_model = database_models.Namespace
         tmp_file, headers = urllib.request.urlretrieve(url)
         
-        config = ConfigParser(delimiters=self.__ns_delimiters, strict=False)
+        config = ConfigParser(delimiters=("=", "|", ":"), strict=False)
         config.optionxform = lambda option: option
         config.read_file(open(tmp_file))
+        
+        vers = int(config['Namespace']['VersionString'])
+        key = config['Namespace']['Keyword']
+        
+        keyword_exists = self.__db_session.query(exists().where(database_models.Namespace.keyword==key)).scalar()
+        
+        # TODO: Keep both versions or delete old entries?
+        
+        if keyword_exists:
+            version_exists = self.__db_session.query(exists().where(database_models.Namespace.version==vers)).filter_by(keyword=key).scalar()
+            if not version_exists:
+                self.__insert_bel_namespace(url)
+                
+        else:
+            self.__insert_bel_namespace(url)
+        
+    def __insert_bel_namespace(self, namespace_url):
+        """
+        Inserts namespace to database.
+        
+        :return: Namespace dict. i.e.: {Namespace_Keyword:{Name:Encoding}}
+        """
+        tmp_time = time.time()
+        namespace_insert_values = []
+        name_insert_values = []
 
+        tmp_file, headers = urllib.request.urlretrieve(namespace_url)
+        
+        config = ConfigParser(delimiters=("=", "|", ":"), strict=False)
+        config.optionxform = lambda option: option
+        config.read_file(open(tmp_file))
+        
+        namespace_key = config['Namespace']['Keyword']
+        
+        namespace_insert_values = [{'url':namespace_url,
+                                    'author':config['Author']['NameString'],
+                                    'keyword':namespace_key,
+                                    'pubDate':datetime.strptime(config['Citation']['PublishedDate'],'%Y-%m-%d') if 'PublishedDate' in config['Citation'] else None,
+                                    'copyright':config['Author']['CopyrightString'],
+                                    'version':int(config['Namespace']['VersionString']),
+                                    'contact':config['Author']['ContactInfoString']}]
+                    
+        namespace_entry = self.__db_engine.execute(database_models.Namespace.__table__.insert(),namespace_insert_values)
+        namespace_pk = namespace_entry.inserted_primary_key[0]
+        
+        names_dict = dict(config['Values'])
+        self.namespace_cache_dict[namespace_key] = dict(config['Values'])
+        
+        name_insert_values = [{'namespace_id':namespace_pk,'name':name_info[0],'encoding':name_info[1]} for name_info in names_dict.items()]
+        
+        self.__db_engine.execute(database_models.Namespace_Name.__table__.insert(),name_insert_values)
+        
+        print("[INFO] Done parsing {ns_key} ({runtime:3.2f}s)".format(ns_key=namespace_key,runtime=(time.time()-tmp_time)))
+           
     def create_namespace_uniprot_map(self, namespace):
         """
         Creates mapping dictionary. i.e.: {Namespace:{Namespace_id:{set, uniprot_ids}, UniProt:{UniProt_id:{set, namespace_ids}}
@@ -170,13 +194,6 @@ class Mapper:
         print('[INFO] Map for "{mapped_namespace}" created ({runtime:3.2f}s)'.format(mapped_namespace=namespace,runtime=(time.time()-start_time)))
         
         return result_dict
-        
-    def create_namespace_namespace_map(self, namespaceA, namespaceB):
-        """
-        Creates a dictionary that maps from namespaceA to namespaceB. i.e.: {NamespaceA:{NamespaceA_id:{set, namespaceB_ids},NamespaceB:{NamespaceB_id:{set, namespaceA_ids}}
-        """
-        # TODO get this done!
-        uniprot_map_dataframe = pd.read_sql_table('pybelmap_root', self.__db_engine)
           
     def create_complete_map(self):
         """
