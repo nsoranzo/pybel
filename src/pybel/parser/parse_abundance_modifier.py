@@ -1,39 +1,60 @@
 import logging
 
 from pyparsing import *
+from pyparsing import pyparsing_common as ppc
 
-from .baseparser import BaseParser, LP, RP, WCW, word, nest
+from .baseparser import BaseParser, WCW, word, nest
 from .language import aa_triple, amino_acid, dna_nucleotide, dna_nucleotide_labels, rna_nucleotide_labels
 from .parse_identifier import IdentifierParser
 
-log = logging.getLogger(__name__)
+log = logging.getLogger('pybel')
 
 dna_nucleotide_seq = Word(''.join(dna_nucleotide_labels.keys()))
 rna_nucleotide_seq = Word(''.join(rna_nucleotide_labels.keys()))
 
-hgvs_rna_del = (Suppress('r.') + pyparsing_common.integer() +
+"""
+From http://varnomen.hgvs.org/recommendations/general/
+a letter prefix should be used to indicate the reference sequence used. Accepted prefixes are;
+“g.” for a genomic reference sequence
+“m.” for a mitochondrial reference sequence
+“c.” for a coding DNA reference sequence
+“n.” for a non-coding DNA reference sequence
+“r.” for an RNA reference sequence (transcript)
+“p.” for a protein reference sequence
+"""
+
+p_dot = Literal('p.')  #: protein reference sequence
+r_dot = Literal('r.')  #: rna transcript reference sequence
+c_dot = Literal('c.')  #: coding DNA reference sequence
+g_dot = Literal('g.')  #: genomic reference sequence
+
+deletion = Literal('del')
+
+hgvs_rna_del = (r_dot + pyparsing_common.integer() +
                 Suppress('_') + pyparsing_common.integer() + 'del' +
                 rna_nucleotide_seq)
 
-hgvs_dna_del = (Suppress('c.') + pyparsing_common.integer() +
+hgvs_dna_del = (c_dot + pyparsing_common.integer() +
                 Suppress('_') + pyparsing_common.integer() + 'del' +
                 dna_nucleotide_seq)
 
-hgvs_chromosome = (Suppress('g.') + pyparsing_common.integer() +
+hgvs_chromosome = (g_dot + pyparsing_common.integer() +
                    Suppress('_') + pyparsing_common.integer() + 'del' +
                    dna_nucleotide_seq)
 
 hgvs_snp = 'del' + dna_nucleotide_seq
 
-hgvs_protein_del = Suppress('p.') + aa_triple + pyparsing_common.integer() + 'del'
+hgvs_protein_del = p_dot + aa_triple + pyparsing_common.integer() + 'del'
 
-hgvs_protein_mut = Suppress('p.') + aa_triple + pyparsing_common.integer() + aa_triple
+hgvs_protein_mut = p_dot + aa_triple + pyparsing_common.integer() + aa_triple
 
-hgvs_protein_fs = Suppress('p.') + aa_triple + pyparsing_common.integer() + aa_triple + 'fs'
+hgvs_protein_fs = p_dot + aa_triple + pyparsing_common.integer() + aa_triple + 'fs'
 
-hgvs_genomic = Suppress('g.') + pyparsing_common.integer() + dna_nucleotide + Suppress('>') + dna_nucleotide
+hgvs_genomic = g_dot + pyparsing_common.integer() + dna_nucleotide + Suppress('>') + dna_nucleotide
 
-hgvs = (hgvs_rna_del | hgvs_dna_del | hgvs_chromosome | hgvs_snp | hgvs_protein_del |
+hgvs_protein_truncation = p_dot + 'C' + pyparsing_common.integer()('location') + '*'
+
+hgvs = (hgvs_protein_truncation | hgvs_rna_del | hgvs_dna_del | hgvs_chromosome | hgvs_snp | hgvs_protein_del |
         hgvs_protein_fs | hgvs_protein_mut | hgvs_genomic | '=' | '?')
 
 
@@ -43,12 +64,8 @@ class VariantParser(BaseParser):
     """
 
     def __init__(self):
-        variant_tags = oneOf(['var', 'variant'])
-        self.language = Suppress(variant_tags) + nest(hgvs)
-        self.language.setParseAction(self.handle_variant)
-
-    def handle_variant(self, s, l, tokens):
-        return tokens
+        variant_tags = oneOf(['var', 'variant']).setParseAction(replaceWith('Variant'))
+        self.language = variant_tags + nest(hgvs)
 
     def get_language(self):
         return self.language
@@ -62,9 +79,22 @@ class PsubParser(BaseParser):
         self.language.setParseAction(self.handle_psub)
 
     def handle_psub(self, s, l, tokens):
-        log.debug('PyBEL006 deprecated protein substitution function. User variant() instead. {}'.format(s))
-        tokens[0] = 'Variant'
-        return tokens
+        log.log(5, 'PyBEL006 sub() is deprecated: %s', s)
+        return ['Variant', 'p.', tokens['reference'], tokens['position'], tokens['variant']]
+
+    def get_language(self):
+        return self.language
+
+
+class TruncParser(BaseParser):
+    def __init__(self):
+        trunc_tag = oneOf(['trunc', 'truncation']).setParseAction(replaceWith('Variant'))
+        self.language = trunc_tag + nest(pyparsing_common.integer()('position'))
+        self.language.setParseAction(self.handle_trunc_legacy)
+
+    def handle_trunc_legacy(self, s, l, tokens):
+        log.log(5, 'PyBEL025 trunc() is deprecated: {}'.format(s))
+        return ['Variant', 'C', tokens['position'], '*']
 
     def get_language(self):
         return self.language
@@ -77,15 +107,14 @@ class GsubParser(BaseParser):
     """
 
     def __init__(self):
-        gsub_tag = oneOf(['sub', 'substitution'])
+        gsub_tag = oneOf(['sub', 'substitution']).setParseAction(replaceWith('Variant'))
         self.language = gsub_tag + nest(dna_nucleotide('reference'), pyparsing_common.integer()('position'),
                                         dna_nucleotide('variant'))
         self.language.setParseAction(self.handle_gsub)
 
     def handle_gsub(self, s, l, tokens):
-        log.debug('PyBEL009 old SNP annotation. Use variant() instead: {}'.format(s))
-        tokens[0] = 'Variant'
-        return tokens
+        log.log(5, 'PyBEL009 sub() is deprecated: %s', s)
+        return ['Variant', 'g.', tokens['position'], tokens['reference'], '>', tokens['variant']]
 
     def get_language(self):
         return self.language
@@ -97,19 +126,11 @@ class FragmentParser(BaseParser):
     """
 
     def __init__(self):
-        self.fragment_range = (pyparsing_common.integer() | '?') + Suppress('_') + (
-            pyparsing_common.integer() | '?' | '*')
-        fragment_tags = ['frag', 'fragment']
-        fragment_1 = oneOf(fragment_tags) + LP + self.fragment_range + WCW + word + RP
-        fragment_2 = oneOf(fragment_tags) + LP + self.fragment_range + RP
-        fragment_3 = oneOf(fragment_tags) + LP + '?' + Optional(WCW + word) + RP
-
-        self.language = fragment_3 | fragment_1 | fragment_2
-        self.language.setParseAction(self.handle_fragment)
-
-    def handle_fragment(self, s, l, tokens):
-        tokens[0] = 'Fragment'
-        return tokens
+        self.fragment_range = (ppc.integer | '?')('start') + Suppress('_') + (ppc.integer | '?' | '*')('stop')
+        self.missing_fragment = Keyword('?')('missing')
+        fragment_tag = oneOf(['frag', 'fragment']).setParseAction(replaceWith('Fragment'))
+        self.language = fragment_tag + nest(
+            (self.fragment_range | self.missing_fragment) + Optional(WCW + word('description')))
 
     def get_language(self):
         return self.language
@@ -121,7 +142,7 @@ class FusionParser(BaseParser):
     """
 
     def __init__(self, namespace_parser=None):
-        fusion_tags = ['fus', 'fusion']
+        fusion_tags = oneOf(['fus', 'fusion']).setParseAction(replaceWith('Fusion'))
 
         self.identifier_parser = namespace_parser if namespace_parser is not None else IdentifierParser()
         identifier = self.identifier_parser.get_language()
@@ -129,15 +150,11 @@ class FusionParser(BaseParser):
         range_coordinate = (Group(oneOf(['r', 'p']) + Suppress('.') + pyparsing_common.integer() +
                                   Suppress('_') + pyparsing_common.integer()) | '?')
 
-        self.language = oneOf(fusion_tags) + nest(Group(identifier)('partner_5p'),range_coordinate('range_5p'),Group(identifier)('partner_3p'),range_coordinate('range_3p'))
-        self.language.setParseAction(self.handle_fusion)
+        self.language = fusion_tags + nest(Group(identifier)('partner_5p'), range_coordinate('range_5p'),
+                                           Group(identifier)('partner_3p'), range_coordinate('range_3p'))
 
     def get_language(self):
         return self.language
-
-    def handle_fusion(self, s, l, tokens):
-        tokens[0] = 'Fusion'
-        return tokens
 
 
 class LocationParser(BaseParser):

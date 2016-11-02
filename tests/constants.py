@@ -1,7 +1,18 @@
+import os
 import unittest
 
-from .parse_bel import BelParser
-from .utils import subdict_matches, any_subdict_matches
+from pybel.parser.parse_bel import BelParser
+from pybel.parser.utils import subdict_matches, any_subdict_matches
+
+dir_path = os.path.dirname(os.path.realpath(__file__))
+
+test_ns_1 = os.path.join(dir_path, 'bel', 'test_ns_1.belns')
+test_bel_1 = os.path.join(dir_path, 'bel', 'test_bel_1.bel')
+test_bel_2 = os.path.join(dir_path, 'bel', 'test_bel_2.bel')
+test_bel_3 = os.path.join(dir_path, 'bel', 'test_bel_3.bel')
+
+test_citation_bel = 'SET Citation = {"TestType","TestName","TestRef"}'
+test_citation_dict = dict(citation_type='TestType', citation_name='TestName', citation_reference='TestRef')
 
 
 class TestTokenParserBase(unittest.TestCase):
@@ -10,11 +21,7 @@ class TestTokenParserBase(unittest.TestCase):
         cls.parser = BelParser()
 
     def setUp(self):
-        self.parser.graph.clear()
-        self.parser.clear_annotations()
-        self.parser.node_to_id.clear()
-        self.parser.id_to_node.clear()
-        self.parser.node_count = 0
+        self.parser.clear()
 
     def assertHasNode(self, member, msg=None, **kwargs):
         self.assertIn(member, self.parser.graph)

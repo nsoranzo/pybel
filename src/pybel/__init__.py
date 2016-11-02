@@ -1,18 +1,29 @@
-"""A Python package for parsing, validating, and analysis of of BEL graphs"""
+"""Parsing, validation, and analysis of of BEL graphs"""
+
+from __future__ import print_function
 
 from . import cli
-from .graph import BELGraph, from_path, from_lines, from_url, from_database
+from . import graph
+from .graph import *
 
-__all__ = ['from_url', 'from_path', 'from_lines', 'from_database']
+small_corpus_url = 'http://resource.belframework.org/belframework/1.0/knowledge/small_corpus.bel'
+large_corpus_url = 'http://resource.belframework.org/belframework/1.0/knowledge/large_corpus.bel'
 
-__version__ = '0.1.2'
+__all__ = ['small_corpus_url', 'large_corpus_url'] + graph.__all__
+
+__version__ = '0.2.4-dev'
 
 __title__ = 'PyBEL'
-__description__ = 'A Python package for parsing, validating, and analysis of of BEL graphs'
-__url__ = 'https://github.com/cthoyt/pybel'
+__description__ = 'Parsing, validation, and analysis of BEL graphs'
+__url__ = 'https://github.com/pybel/pybel'
 
-__author__ = 'Charles Tapley Hoyt'
+__author__ = 'Charles Tapley Hoyt, Andrej Konotopez, Christian Ebeling'
 __email__ = 'charles.hoyt@scai.fraunhofer.de'
 
-__license__ = 'All Rights Reserved.'
-__copyright__ = 'Copyright (c) Charles Tapley Hoyt'
+__license__ = 'Apache 2.0 License'
+__copyright__ = 'Copyright (c) 2016 Charles Tapley Hoyt, Andrej Konotopez, Christian Ebeling'
+
+
+def print_version():
+    """Convenience function for printing the PyBEL version"""
+    print('{} Version: {}'.format(__title__, __version__))

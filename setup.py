@@ -1,14 +1,10 @@
-from setuptools import setup
-
-# see https://python-packaging.readthedocs.org/en/latest/minimal.html
-# TODO: publish on PyPi https://hynek.me/articles/sharing-your-labor-of-love-pypi-quick-and-dirty/
-
 """Setup module for the PyBEL package"""
 
-import setuptools
 import codecs  # To use a consistent encoding
 import os
 import re
+
+import setuptools
 
 #################################################################
 
@@ -16,12 +12,14 @@ PACKAGES = setuptools.find_packages(where='src')
 META_PATH = os.path.join('src', 'pybel', '__init__.py')
 KEYWORDS = ['Fraunhofer', 'SCAI', 'BEL']
 CLASSIFIERS = [
-    'Development Status :: 1 - Planning',
+    'Development Status :: 4 - Beta',
     'Environment :: Console',
     'Intended Audience :: Developers',
-    'License :: Other/Proprietary License',
+    'Intended Audience :: Science/Research',
+    'License :: OSI Approved :: Apache Software License',
     'Operating System :: OS Independent',
     'Programming Language :: Python',
+    'Programming Language :: Python :: 2.7',
     'Programming Language :: Python :: 3.5',
     'Topic :: Scientific/Engineering :: Bio-Informatics'
 ]
@@ -32,7 +30,10 @@ INSTALL_REQUIRES = [
     'pyparsing',
     'configparser',
     'py2neo',
-    'click'
+    'click',
+    'sqlalchemy',
+    'pandas',
+    'matplotlib'
 ]
 EXTRAS_REQUIRE = {}
 TESTS_REQUIRE = ['tox']
@@ -51,6 +52,7 @@ def read(*parts):
     """Build an absolute path from *parts* and return the contents of the resulting file. Assume UTF-8 encoding."""
     with codecs.open(os.path.join(HERE, *parts), 'rb', 'utf-8') as f:
         return f.read()
+
 
 META_FILE = read(META_PATH)
 
@@ -72,6 +74,7 @@ def get_long_description():
         long_description = f.read()
     return long_description
 
+
 if __name__ == '__main__':
     setuptools.setup(
         name=find_meta('title'),
@@ -81,7 +84,8 @@ if __name__ == '__main__':
         url=find_meta('url'),
         author=find_meta('author'),
         author_email=find_meta('email'),
-        maintainer=find_meta('author'),
+        maintainer='Charles Tapley Hoyt',
+        maintainer_email=find_meta('email'),
         license=find_meta('license'),
         classifiers=CLASSIFIERS,
         keywords=KEYWORDS,
@@ -92,4 +96,3 @@ if __name__ == '__main__':
         tests_require=TESTS_REQUIRE,
         entry_points=ENTRY_POINTS
     )
-

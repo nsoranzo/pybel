@@ -1,17 +1,22 @@
-import os
+import logging
 import unittest
 
 import pybel
+from pybel.manager import DefinitionCacheManager
+from pybel.parser import BelParser
+from tests.constants import TestTokenParserBase, test_bel_3, test_bel_1, test_citation_bel, test_citation_dict
 
-dir_path = os.path.dirname(os.path.realpath(__file__))
+logging.getLogger('requests').setLevel(logging.WARNING)
 
 
-class TestImport(unittest.TestCase):
-    @unittest.skip
-    def test_full(self):
+class TestCacheIntegration(unittest.TestCase):
+    def test_cached_winning(self):
+        c_path = 'sqlite://'
 
-        path = os.path.join(dir_path, 'bel', 'test_bel_1.bel')
-        g = pybel.from_file(path)
+        c = DefinitionCacheManager(conn=c_path, setup_default_cache=False)
+
+        with open(test_bel_3) as f:
+            g = pybel.BELGraph(f, definition_cache_manager=c)
 
         expected_document_metadata = {
             'Name': "PyBEL Test Document",
@@ -23,4 +28,147 @@ class TestImport(unittest.TestCase):
             'ContactInfo': "charles.hoyt@scai.fraunhofer.de"
         }
 
-        self.assertEqual(expected_document_metadata, g.mdp.document_metadata)
+        self.assertEqual(expected_document_metadata, g.metadata_parser.document_metadata)
+
+
+class TestImport(unittest.TestCase):
+    def test_full(self):
+        g = pybel.from_path(test_bel_1)
+
+        expected_document_metadata = {
+            'Name': "PyBEL Test Document",
+            "Description": "Made for testing PyBEL parsing",
+            'Version': "1.6",
+            'Copyright': "Copyright (c) Charles Tapley Hoyt. All Rights Reserved.",
+            'Authors': "Charles Tapley Hoyt",
+            'Licenses': "Other / Proprietary",
+            'ContactInfo': "charles.hoyt@scai.fraunhofer.de"
+        }
+
+        self.assertEqual(expected_document_metadata, g.metadata_parser.document_metadata)
+
+        nodes = list(g.nodes_iter(namespace='ALPHABET', name='A'))
+        self.assertEqual(3, len(nodes))
+
+        edges = list(g.edges_iter(relation='increases'))
+        self.assertEqual(2, len(edges))
+
+    def test_from_path(self):
+        g = pybel.from_path(test_bel_1)
+        self.assertIsNotNone(g)
+
+    def test_from_fileUrl(self):
+        g = pybel.from_url('file://{}'.format(test_bel_1))
+        self.assertIsNotNone(g)
+
+
+class TestFull(TestTokenParserBase):
+    def setUp(self):
+        namespaces = {
+            'TESTNS': {"1", "2"}
+        }
+
+        annotations = {
+            'TestAnnotation1': {'A', 'B', 'C'},
+            'TestAnnotation2': {'X', 'Y', 'Z'},
+            'TestAnnotation3': {'D', 'E', 'F'}
+        }
+
+        self.parser = BelParser(valid_namespaces=namespaces, valid_annotations=annotations)
+
+    def test_annotations(self):
+        statements = [
+            test_citation_bel,
+            'SET TestAnnotation1 = "A"',
+            'SET TestAnnotation2 = "X"',
+            'g(TESTNS:1) -> g(TESTNS:2)'
+        ]
+        self.parser.parse_lines(statements)
+
+        test_node_1 = 'Gene', 'TESTNS', '1'
+        test_node_2 = 'Gene', 'TESTNS', '2'
+
+        self.assertEqual(2, self.parser.graph.number_of_nodes())
+        self.assertHasNode(test_node_1)
+        self.assertHasNode(test_node_2)
+
+        self.assertEqual(1, self.parser.graph.number_of_edges())
+
+        kwargs = {'TestAnnotation1': 'A', 'TestAnnotation2': 'X'}
+        kwargs.update(test_citation_dict)
+        self.assertHasEdge(test_node_1, test_node_2, **kwargs)
+
+    def test_annotations_withList(self):
+        statements = [
+            test_citation_bel,
+            'SET TestAnnotation1 = {"A","B"}',
+            'SET TestAnnotation2 = "X"',
+            'g(TESTNS:1) -> g(TESTNS:2)'
+        ]
+        self.parser.parse_lines(statements)
+
+        test_node_1 = 'Gene', 'TESTNS', '1'
+        test_node_2 = 'Gene', 'TESTNS', '2'
+
+        self.assertEqual(2, self.parser.graph.number_of_nodes())
+        self.assertHasNode(test_node_1)
+        self.assertHasNode(test_node_2)
+
+        self.assertEqual(2, self.parser.graph.number_of_edges())
+        kwargs = {'TestAnnotation1': 'A', 'TestAnnotation2': 'X'}
+        kwargs.update(test_citation_dict)
+        self.assertHasEdge(test_node_1, test_node_2, **kwargs)
+        kwargs = {'TestAnnotation1': 'B', 'TestAnnotation2': 'X'}
+        kwargs.update(test_citation_dict)
+        self.assertHasEdge(test_node_1, test_node_2, **kwargs)
+
+    def test_annotations_withMultiList(self):
+        statements = [
+            test_citation_bel,
+            'SET TestAnnotation1 = {"A","B"}',
+            'SET TestAnnotation2 = "X"',
+            'SET TestAnnotation3 = {"D","E"}',
+            'g(TESTNS:1) -> g(TESTNS:2)'
+        ]
+        self.parser.parse_lines(statements)
+
+        test_node_1 = 'Gene', 'TESTNS', '1'
+        test_node_2 = 'Gene', 'TESTNS', '2'
+
+        self.assertEqual(2, self.parser.graph.number_of_nodes())
+        self.assertHasNode(test_node_1)
+        self.assertHasNode(test_node_2)
+
+        self.assertEqual(4, self.parser.graph.number_of_edges())
+
+        kwargs = {
+            'TestAnnotation1': 'A',
+            'TestAnnotation2': 'X',
+            'TestAnnotation3': 'D'
+        }
+        kwargs.update(test_citation_dict)
+        self.assertHasEdge(test_node_1, test_node_2, **kwargs)
+
+        kwargs = {
+            'TestAnnotation1': 'A',
+            'TestAnnotation2': 'X',
+            'TestAnnotation3': 'E'
+        }
+        kwargs.update(test_citation_dict)
+        self.assertHasEdge(test_node_1, test_node_2, **kwargs)
+
+        kwargs = {
+            'TestAnnotation1': 'B',
+            'TestAnnotation2': 'X',
+            'TestAnnotation3': 'D'
+        }
+        kwargs.update(test_citation_dict)
+        self.assertHasEdge(test_node_1, test_node_2, **kwargs)
+
+        kwargs = {
+            'TestAnnotation1': 'B',
+            'TestAnnotation2': 'X',
+            'TestAnnotation3': 'E'
+        }
+        kwargs.update(test_citation_dict)
+        self.assertHasEdge(test_node_1, test_node_2, **kwargs)

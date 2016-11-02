@@ -2,85 +2,14 @@ import logging
 import os
 import unittest
 
+from pybel.manager import DefinitionCacheManager
 from pybel.parser import ControlParser, MetadataParser
+from pybel.parser.parse_exceptions import *
 from pybel.parser.utils import sanitize_file_lines, split_file_to_annotations_and_definitions
 
 logging.getLogger("requests").setLevel(logging.WARNING)
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-
-
-class TestSanitize(unittest.TestCase):
-    def test_a(self):
-        s = '''SET Evidence = "The phosphorylation of S6K at Thr389, which is the TORC1-mediated site, was not inhibited
-in the SIN1-/- cells (Figure 5A)."'''.split('\n')
-
-        expect = [
-            'SET Evidence = "The phosphorylation of S6K at Thr389, which is the TORC1-mediated site, was not inhibited '
-            'in the SIN1-/- cells (Figure 5A)."']
-        result = list(sanitize_file_lines(s))
-        self.assertEqual(expect, result)
-
-    def test_b(self):
-        s = [
-            '# Set document-defined annotation values\n',
-            'SET Species = 9606',
-            'SET Tissue = "t-cells"',
-            '# Create an Evidence Line for a block of BEL Statements',
-            'SET Evidence = "Here we show that interfereon-alpha (IFNalpha) is a potent producer \\',
-            'of SOCS expression in human T cells, as high expression of CIS, SOCS-1, SOCS-2, \\',
-            'and SOCS-3 was detectable after IFNalpha stimulation. After 4 h of stimulation \\',
-            'CIS, SOCS-1, and SOCS-3 had ret'
-        ]
-
-        result = list(sanitize_file_lines(s))
-
-        expect = [
-            'SET Species = 9606',
-            'SET Tissue = "t-cells"',
-            'SET Evidence = "Here we show that interfereon-alpha (IFNalpha) is a potent producer of SOCS expression in '
-            'human T cells, as high expression of CIS, SOCS-1, SOCS-2, and SOCS-3 was detectable after IFNalpha '
-            'stimulation. After 4 h of stimulation CIS, SOCS-1, and SOCS-3 had ret'
-        ]
-
-        self.assertEqual(expect, result)
-
-    def test_c(self):
-        s = [
-            'SET Evidence = "yada yada yada" //this is a comment'
-        ]
-
-        result = list(sanitize_file_lines(s))
-        expect = ['SET Evidence = "yada yada yada"']
-
-        self.assertEqual(expect, result)
-
-    def test_d(self):
-        """Test forgotten delimiters"""
-        s = [
-            'SET Evidence = "Something',
-            'or other',
-            'or other"'
-        ]
-
-        result = list(sanitize_file_lines(s))
-        expect = ['SET Evidence = "Something or other or other"']
-
-        self.assertEqual(expect, result)
-
-    def test_e(self):
-        path = os.path.join(dir_path, 'bel', 'test_bel_1.bel')
-
-        with open(path) as f:
-            lines = list(sanitize_file_lines(f))
-
-        self.assertEqual(26, len(lines))
-
-    def test_f(self):
-        s = '''SET Evidence = "Arterial cells are highly susceptible to oxidative stress, which can induce both necrosis
-and apoptosis (programmed cell death) [1,2]"'''.split('\n')
-        lines = list(sanitize_file_lines(s))
-        self.assertEqual(1, len(lines))
 
 
 class TestSplitLines(unittest.TestCase):
@@ -93,6 +22,28 @@ class TestSplitLines(unittest.TestCase):
         self.assertEqual(7, len(docs))
         self.assertEqual(5, len(defs))
         self.assertEqual(14, len(states))
+
+
+class TestParseMetadataCached(unittest.TestCase):
+    def setUp(self):
+        dcm = DefinitionCacheManager()
+        dcm.setup_database()
+        self.parser = MetadataParser(definition_cache_manager=dcm)
+
+    def test_control_1(self):
+        s = 'DEFINE NAMESPACE MGI AS URL "http://resource.belframework.org/belframework/1.0/namespace/mgi-approved-symbols.belns"'
+        self.parser.parseString(s)
+
+        self.assertIn('MGI', self.parser.namespace_dict)
+        # TODO LeKono implement namespace_metadata caching loading as well
+        # self.assertIn('MGI', self.parser.namespace_metadata)
+
+        # Test doesn't overwrite
+        s = 'DEFINE NAMESPACE MGI AS LIST {"A","B","C"}'
+        self.parser.parseString(s)
+        self.assertIn('MGI', self.parser.namespace_dict)
+        # self.assertIn('MGI', self.parser.namespace_metadata)
+        self.assertNotIn('A', self.parser.namespace_dict['MGI'])
 
 
 class TestParseMetadata(unittest.TestCase):
@@ -117,13 +68,21 @@ class TestParseMetadata(unittest.TestCase):
         s = 'DEFINE NAMESPACE Custom1 AS LIST {"A","B","C"}'
         self.parser.parseString(s)
         self.assertIn('Custom1', self.parser.namespace_dict)
-        self.assertIn('Custom1', self.parser.namespace_metadata)
 
         s = 'DEFINE NAMESPACE Custom1 AS URL "http://resource.belframework.org/belframework/1.0/namespace/mgi-approved-symbols.belns"'
         self.parser.parseString(s)
         self.assertIn('Custom1', self.parser.namespace_dict)
-        self.assertIn('Custom1', self.parser.namespace_metadata)
         self.assertIn('A', self.parser.namespace_dict['Custom1'])
+
+    def test_control_annotation_lexicographyException(self):
+        s = 'DEFINE ANNOTATION CELLSTRUCTURE AS URL "http://resource.belframework.org/belframework/1.0/annotation/mesh-cell-structure.belanno"'
+        # with self.assertRaises(LexicographyException):
+        self.parser.parseString(s)
+
+    def test_control_namespace_lexicographyException(self):
+        s = 'DEFINE NAMESPACE mgi AS URL "http://resource.belframework.org/belframework/1.0/namespace/mgi-approved-symbols.belns"'
+        # with self.assertRaises(LexicographyException):
+        self.parser.parseString(s)
 
     def test_control_3(self):
         s = 'DEFINE ANNOTATION CellStructure AS URL "http://resource.belframework.org/belframework/1.0/annotation/mesh-cell-structure.belanno"'
@@ -143,12 +102,17 @@ class TestParseMetadata(unittest.TestCase):
         self.assertIn('TextLocation', self.parser.annotations_dict)
         self.assertIn('TextLocation', self.parser.annotations_metadata)
 
-        s = 'DEFINE NAMESPACE TextLocation AS URL "http://resource.belframework.org/belframework/1.0/annotation/mesh-cell-structure.belanno"'
+        s = 'DEFINE ANNOTATION TextLocation AS URL "http://resource.belframework.org/belframework/1.0/annotation/mesh-cell-structure.belanno"'
         self.parser.parseString(s)
         self.assertIn('TextLocation', self.parser.annotations_dict)
         self.assertIn('TextLocation', self.parser.annotations_metadata)
         self.assertIn('Abstract', self.parser.annotations_dict['TextLocation'])
 
+    def test_underscore(self):
+        s = 'DEFINE ANNOTATION Text_Location AS LIST {"Abstract","Results","Legend","Review"}'
+        self.parser.parseString(s)
+        self.assertIn('Text_Location', self.parser.annotations_dict)
+        self.assertIn('Text_Location', self.parser.annotations_metadata)
 
     def test_control_compound_1(self):
         s1 = 'DEFINE NAMESPACE MGI AS URL "http://resource.belframework.org/belframework/1.0/namespace/mgi-approved-symbols.belns"'
@@ -169,6 +133,11 @@ class TestParseMetadata(unittest.TestCase):
         self.assertIn('CellLine', self.parser.annotations_dict)
         self.assertIn('TextLocation', self.parser.annotations_dict)
 
+    def test_document_metadata_exception(self):
+        s = 'SET DOCUMENT InvalidKey = "nope"'
+        with self.assertRaises(IllegalDocumentMetadataException):
+            self.parser.parseString(s)
+
     def test_parse_document(self):
         s = '''SET DOCUMENT Name = "Alzheimer's Disease Model"'''
 
@@ -186,16 +155,9 @@ class TestParseMetadata(unittest.TestCase):
             'BRCO': {'Hippocampus', 'Parietal Lobe'}
         }
 
-        expected_namespace_annoations = {
-            'BRCO': {}
-        }
-
         self.assertIn('BRCO', self.parser.namespace_dict)
         self.assertEqual(2, len(self.parser.namespace_dict['BRCO']))
         self.assertEqual(expected_namespace_dict, self.parser.namespace_dict)
-
-        self.assertIn('BRCO', self.parser.namespace_metadata)
-        self.assertEqual(expected_namespace_annoations, self.parser.namespace_metadata)
 
     def test_parse_namespace_list_2(self):
         s1 = '''SET DOCUMENT Name = "Alzheimer's Disease Model"'''
@@ -209,9 +171,6 @@ class TestParseMetadata(unittest.TestCase):
         }
 
         expected_namespace_annoations = {
-            'BRCO': {
-                'Name': "Alzheimer's Disease Model",
-            }
         }
 
         self.assertIn('BRCO', self.parser.namespace_dict)
@@ -219,9 +178,15 @@ class TestParseMetadata(unittest.TestCase):
         self.assertEqual(expected_namespace_dict, self.parser.namespace_dict)
         self.assertEqual(expected_namespace_annoations, self.parser.namespace_metadata)
 
-    def test_parse_namespace_url_1(self):
+    def test_parse_namespace_url_mismatch(self):
         path = os.path.join(dir_path, 'bel', 'test_ns_1.belns')
         s = '''DEFINE NAMESPACE TEST AS URL "file://{}"'''.format(path)
+        # with self.assertRaises(NamespaceMismatch):
+        self.parser.parseString(s)
+
+    def test_parse_namespace_url_1(self):
+        path = os.path.join(dir_path, 'bel', 'test_ns_1.belns')
+        s = '''DEFINE NAMESPACE TESTNS1 AS URL "file://{}"'''.format(path)
         self.parser.parseString(s)
 
         expected_values = {
@@ -232,8 +197,35 @@ class TestParseMetadata(unittest.TestCase):
             'TestValue5': 'O'
         }
 
-        self.assertIn('TEST', self.parser.namespace_dict)
-        self.assertEqual(expected_values, self.parser.namespace_dict['TEST'])
+        self.assertIn('TESTNS1', self.parser.namespace_dict)
+        self.assertEqual(expected_values, self.parser.namespace_dict['TESTNS1'])
+
+    def test_parse_annotation_url_1(self):
+        path = os.path.join(dir_path, 'bel', 'test_an_1.belanno')
+        s = '''DEFINE ANNOTATION TESTAN1 AS URL "file://{}"'''.format(path)
+        self.parser.parseString(s)
+
+        expected_values = {
+            'TestAnnot1': 'O',
+            'TestAnnot2': 'O',
+            'TestAnnot3': 'O',
+            'TestAnnot4': 'O',
+            'TestAnnot5': 'O'
+        }
+
+        self.assertIn('TESTAN1', self.parser.annotations_dict)
+        self.assertEqual(expected_values, self.parser.annotations_dict['TESTAN1'])
+
+    def test_parse_annotation_url_failure(self):
+        path = os.path.join(dir_path, 'bel', 'test_an_1.belanno')
+        s = '''DEFINE ANNOTATION Test AS URL "file://{}"'''.format(path)
+        # with self.assertRaises(AnnotationMismatch):
+        self.parser.parseString(s)
+
+    def test_parse_pattern(self):
+        s = 'DEFINE ANNOTATION Test AS PATTERN "\w+"'
+        with self.assertRaises(NotImplementedError):
+            self.parser.parseString(s)
 
 
 class TestParseControl(unittest.TestCase):
@@ -243,10 +235,13 @@ class TestParseControl(unittest.TestCase):
             'Custom2': {'Custom2_A', 'Custom2_B'}
         }
 
-        self.parser = ControlParser(custom_annotations=custom_annotations)
+        self.parser = ControlParser(valid_annotations=custom_annotations)
 
     def test_set_statement_group(self):
         s = 'SET STATEMENT_GROUP = "my group"'
+
+        self.assertIsNotNone(self.parser.set_statement_group.parseString(s))
+
         self.parser.parseString(s)
         self.assertEqual('my group', self.parser.statement_group)
 
@@ -254,9 +249,28 @@ class TestParseControl(unittest.TestCase):
         self.parser.parseString(s)
         self.assertIsNone(self.parser.statement_group)
 
-    def test_unset_missing_statement(self):
+    def test_unset_missing_evidence(self):
         s = 'UNSET Evidence'
         self.parser.parseString(s)
+
+    def test_unset_missing_command(self):
+        s = 'UNSET Custom1'
+        with self.assertRaises(MissingAnnotationKeyException):
+            self.parser.parseString(s)
+
+    def test_unset_invalid_command(self):
+        s = 'UNSET Custom3'
+        with self.assertRaises(InvalidAnnotationKeyException):
+            self.parser.parseString(s)
+
+    def test_unset_missing_citation(self):
+        s = 'UNSET Citation'
+        self.parser.parseString(s)
+
+    def test_set_missing_statement(self):
+        s = 'SET MissingKey = "lol"'
+        with self.assertRaises(InvalidAnnotationKeyException):
+            self.parser.parseString(s)
 
     def test_citation_short(self):
         s = 'SET Citation = {"PubMed","Trends in molecular medicine","12928037"}'
@@ -279,6 +293,9 @@ class TestParseControl(unittest.TestCase):
         }
         self.assertEqual(expected_annotations, annotations)
 
+        self.parser.parseString('UNSET Citation')
+        self.assertEqual(0, len(self.parser.citation))
+
     def test_citation_long(self):
         s = 'SET Citation = {"PubMed","Trends in molecular medicine","12928037","","de Nigris|Lerman A|Ignarro LJ",""}'
 
@@ -296,7 +313,7 @@ class TestParseControl(unittest.TestCase):
         self.assertEqual(expected_citation, self.parser.citation)
 
     def test_citation_error(self):
-        s = 'SET Citation = {"PubMed","Trends in molecular medicine","12928037",""}'
+        s = 'SET Citation = {"PubMed","Trends in molecular medicine"}'
         with self.assertRaises(Exception):
             self.parser.parseString(s)
 
@@ -329,6 +346,12 @@ class TestParseControl(unittest.TestCase):
         }
 
         self.assertEqual(expected_annotation, self.parser.annotations)
+
+    def test_custom_annotation_list_withInvalid(self):
+        s = 'SET Custom1 = {"Custom1_A","Custom1_B","Evil invalid!!!"}'
+
+        with self.assertRaises(IllegalAnnotationValueExeption):
+            self.parser.parseString(s)
 
     def test_custom_key_failure(self):
         s = 'SET FAILURE = "never gonna happen"'
@@ -373,16 +396,25 @@ class TestParseControl(unittest.TestCase):
 
         s3 = 'SET Citation = {"e","f","g"}'
         s4 = 'SET Evidence = "h"'
+        s5 = 'SET Custom1 = "Custom1_A"'
+        s6 = 'SET Custom2 = "Custom2_A"'
 
-        self.parser.parseString(s1)
-        self.parser.parseString(s2)
-        self.parser.parseString(s3)
-        self.parser.parseString(s4)
+        self.parser.parse_lines([s1, s2, s3, s4, s5, s6])
 
         self.assertEqual('h', self.parser.annotations['Evidence'])
         self.assertEqual('e', self.parser.citation['type'])
         self.assertEqual('f', self.parser.citation['name'])
         self.assertEqual('g', self.parser.citation['reference'])
+
+        self.parser.parseString('UNSET {"Custom1","Evidence"}')
+        self.assertNotIn('Custom1', self.parser.annotations)
+        self.assertNotIn('Evidence', self.parser.annotations)
+        self.assertIn('Custom2', self.parser.annotations)
+        self.assertNotEqual(0, len(self.parser.citation))
+
+        self.parser.parseString('UNSET ALL')
+        self.assertEqual(0, len(self.parser.annotations))
+        self.assertEqual(0, len(self.parser.citation))
 
 
 class TestParseEvidence(unittest.TestCase):
@@ -398,7 +430,7 @@ class TestParseEvidence(unittest.TestCase):
         statement = '''SET Evidence = "3.1 Backward slash break test \\
 second line"'''
         expect = '''SET Evidence = "3.1 Backward slash break test second line"'''
-        lines = list(sanitize_file_lines(statement.split('\n')))
+        lines = [line for i, line in sanitize_file_lines(statement.split('\n'))]
         self.assertEqual(1, len(lines))
         line = lines[0]
         self.assertEqual(expect, line)
@@ -407,7 +439,7 @@ second line"'''
         statement = '''SET Evidence = "3.2 Backward slash break test with whitespace \\
 second line"'''
         expect = '''SET Evidence = "3.2 Backward slash break test with whitespace second line"'''
-        lines = list(sanitize_file_lines(statement.split('\n')))
+        lines = [line for i, line in sanitize_file_lines(statement.split('\n'))]
         self.assertEqual(1, len(lines))
         line = lines[0]
         self.assertEqual(expect, line)
@@ -417,7 +449,7 @@ second line"'''
 second line \\
 third line"'''
         expect = '''SET Evidence = "3.3 Backward slash break test second line third line"'''
-        lines = list(sanitize_file_lines(statement.split('\n')))
+        lines = [line for i, line in sanitize_file_lines(statement.split('\n'))]
         self.assertEqual(1, len(lines))
         line = lines[0]
         self.assertEqual(expect, line)
@@ -426,7 +458,7 @@ third line"'''
         statement = '''SET Evidence = "4.1 Malformed line breakcase
 second line"'''
         expect = '''SET Evidence = "4.1 Malformed line breakcase second line"'''
-        lines = list(sanitize_file_lines(statement.split('\n')))
+        lines = [line for i, line in sanitize_file_lines(statement.split('\n'))]
         self.assertEqual(1, len(lines))
         line = lines[0]
         self.assertEqual(expect, line)
@@ -436,7 +468,7 @@ second line"'''
 second line
 third line"'''
         expect = '''SET Evidence = "4.2 Malformed line breakcase second line third line"'''
-        lines = list(sanitize_file_lines(statement.split('\n')))
+        lines = [line for i, line in sanitize_file_lines(statement.split('\n'))]
         self.assertEqual(1, len(lines))
         line = lines[0]
         self.assertEqual(expect, line)
