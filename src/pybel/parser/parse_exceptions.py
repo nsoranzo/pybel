@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from ..exceptions import PyBelWarning
 
 
@@ -95,3 +97,8 @@ class MissingCitationException(PyBelWarning):
     """Tried to add an edge, but no citatation present. Most likely due to previous improperly formatted citation"""
     #:
     code = 36
+
+
+class IllegalFunctionSemantic(PyBelWarning):
+    """Used an identifier in a semantically invalid function"""
+    code = 37  #:

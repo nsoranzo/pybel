@@ -8,17 +8,15 @@ import networkx as nx
 import py2neo
 import requests
 from networkx.readwrite import json_graph
-from pybel.exceptions import PyBelWarning
-from pybel.utils import flatten
 from pyparsing import ParseException
 from requests_file import FileAdapter
 
-from .exceptions import PyBelError
+from .exceptions import PyBelWarning, PyBelError
 from .manager.namespace_cache import DefinitionCacheManager
 from .parser.parse_bel import BelParser
 from .parser.parse_metadata import MetadataParser
 from .parser.utils import split_file_to_annotations_and_definitions, subdict_matches
-from .utils import flatten_edges, expand_edges
+from .utils import flatten, flatten_graph_data, expand_dict
 
 __all__ = ['BELGraph', 'from_url', 'from_path', 'from_pickle',
            'from_graphml', 'to_graphml', 'to_json', 'to_neo4j', 'to_pickle']
@@ -47,7 +45,7 @@ def from_url(url, **kwargs):
 
     lines = (line.decode('utf-8') for line in response.iter_lines())
 
-    return BELGraph(lines, **kwargs)
+    return BELGraph(lines=lines, **kwargs)
 
 
 def from_path(path, **kwargs):
@@ -61,7 +59,7 @@ def from_path(path, **kwargs):
 
     log.info('Loading from path: %s', path)
     with open(os.path.expanduser(path)) as f:
-        return BELGraph(f, **kwargs)
+        return BELGraph(lines=f, **kwargs)
 
 
 def from_database(connection):
@@ -81,7 +79,7 @@ def from_database(connection):
 class BELGraph(nx.MultiDiGraph):
     """An extension of a NetworkX MultiDiGraph to hold a BEL graph."""
 
-    def __init__(self, lines, context=None, lenient=False, definition_cache_manager=None, log_stream=None,
+    def __init__(self, lines=None, context=None, lenient=False, definition_cache_manager=None, log_stream=None,
                  *attrs, **kwargs):
         """Parses a BEL file from an iterable of strings. This can be a file, file-like, or list of strings.
 
@@ -99,6 +97,24 @@ class BELGraph(nx.MultiDiGraph):
         """
         nx.MultiDiGraph.__init__(self, *attrs, **kwargs)
 
+        self.last_parse_errors = 0
+
+        if lines is not None:
+            self.parse_lines(lines, context, lenient, definition_cache_manager, log_stream)
+
+    def parse_lines(self, lines, context=None, lenient=False, definition_cache_manager=None, log_stream=None):
+        """Parses an iterable of lines into this graph
+
+        :param lines: iterable over lines of BEL data file
+        :param context: disease context string
+        :type context: str
+        :param lenient: if true, allow naked namespaces
+        :type lenient: bool
+        :param definition_cache_manager: database connection string to namespace namspace_cache, pre-built namespace namspace_cache manager,
+                    or True to use the default
+        :type definition_cache_manager: str or pybel.mangager.NamespaceCache or bool
+        :param log_stream: a stream to write debug logging to
+        """
         if log_stream is not None:
             sh = logging.StreamHandler(stream=log_stream)
             sh.setLevel(5)
@@ -127,10 +143,6 @@ class BELGraph(nx.MultiDiGraph):
                                     lenient=lenient)
 
         self.parse_statements(states)
-
-    def clear(self):
-        """Clears the content of the graph and its BEL parser"""
-        self.bel_parser.clear()
 
     def parse_document(self, document_metadata):
         t = time.time()
@@ -171,6 +183,8 @@ class BELGraph(nx.MultiDiGraph):
 
         t = time.time()
 
+        self.last_parse_errors = 0
+
         for line_number, line in statements:
             try:
                 self.bel_parser.parseString(line)
@@ -179,10 +193,14 @@ class BELGraph(nx.MultiDiGraph):
                 raise e
             except ParseException as e:
                 log.error('Line %07d - general parser failure: %s', line_number, line)
+                self.last_parse_errors += 1
             except PyBelWarning as e:
                 log.warning('Line %07d - %s: %s', line_number, e, line)
+                self.last_parse_errors += 1
             except:
-                log.error('Line %07d - general failure: %s', line_number, line)
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                log.error('Line %07d - general failure: %s - %s: %s', line_number, line, exc_type, exc_value)
+                self.last_parse_errors += 1
 
         log.info('Finished parsing statements section in %.02f seconds', time.time() - t)
 
@@ -255,11 +273,14 @@ def to_neo4j(graph, neo_graph, context=None):
 def to_pickle(graph, output):
     """Writes this graph to a pickle object with nx.write_gpickle
 
+    Cast as a nx.MultiDiGraph before outputting because the pickle serializer can't handle the PyParsing elements
+    within the BELGraph class.
+
     :param graph: a BEL graph
     :type graph: BELGraph
     :param output: a file or filename to write to
     """
-    nx.write_gpickle(flatten_edges(graph), output)
+    nx.write_gpickle(nx.MultiDiGraph(graph), output)
 
 
 def from_pickle(path):
@@ -267,9 +288,9 @@ def from_pickle(path):
 
     :param path: File or filename to write. Filenames ending in .gz or .bz2 will be uncompressed.
     :type path: file or list
-    :rtype: networkx.MultiDiGraph
+    :rtype: BELGraph
     """
-    return expand_edges(nx.read_gpickle(path))
+    return BELGraph(data=nx.read_gpickle(path))
 
 
 def to_json(graph, output):
@@ -279,8 +300,16 @@ def to_json(graph, output):
     :type graph: BELGraph
     :param output: a write-supporting filelike object
     """
-    data = json_graph.node_link_data(flatten_edges(graph))
+    data = json_graph.node_link_data(flatten_graph_data(graph))
     json.dump(data, output, ensure_ascii=False)
+
+
+def from_json(path):
+    """Reads graph from node-link JSON Object"""
+    with open(os.path.expanduser(path)) as f:
+        data = json.load(f)
+    g = json_graph.node_link_graph(data)
+    return expand_edges(g)
 
 
 def to_graphml(graph, output):
@@ -290,7 +319,16 @@ def to_graphml(graph, output):
     :type graph: BELGraph
     :param output: a file or filelike object
     """
-    nx.write_graphml(flatten_edges(graph), output)
+
+    g = nx.MultiDiGraph()
+
+    for node, data in graph.nodes(data=True):
+        g.add_node(node, json=json.dumps(data))
+
+    for u, v, key, data in graph.edges(data=True, keys=True):
+        g.add_edge(u, v, key=key, attr_dict=flatten(data))
+
+    nx.write_graphml(g, output)
 
 
 def from_graphml(path):
@@ -300,7 +338,11 @@ def from_graphml(path):
     :type path: file or string
     :rtype: networkx.MultiDiGraph
     """
-    return expand_edges(nx.read_graphml(path))
+    g = nx.read_graphml(path)
+    g = expand_edges(g)
+    for n in g:
+        g.node[n] = json.loads(g.node[n]['json'])
+    return g
 
 
 def to_csv(graph, output):
@@ -310,4 +352,23 @@ def to_csv(graph, output):
     :type graph: BELGraph
     :param output: a file or filelike object
     """
-    nx.write_edgelist(flatten_edges(graph), output, data=True)
+    nx.write_edgelist(flatten_graph_data(graph), output, data=True)
+
+
+def expand_edges(graph):
+    """Returns a new graph with expanded edge data dictionaries
+
+    :param graph: nx.MultiDiGraph
+    :type graph: BELGraph
+    :rtype: BELGraph
+    """
+
+    g = BELGraph()
+
+    for node, data in graph.nodes(data=True):
+        g.add_node(node, data)
+
+    for u, v, key, data in graph.edges(data=True, keys=True):
+        g.add_edge(u, v, key=key, attr_dict=expand_dict(data))
+
+    return g
