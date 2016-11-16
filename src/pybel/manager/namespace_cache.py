@@ -148,6 +148,30 @@ class DefinitionCacheManager:
             elif definition_url.endswith('.belanno'):
                 self.annotation_cache[definition_url] = cache[definition_url]
 
+    def get_cache_with_id(self):
+        """Creates the namespace and annotation caches that contain ids"""
+        definition_dataframe = pd.read_sql_table(DEFINITION_TABLE_NAME, self.eng)
+        context_dataframe = pd.read_sql_table(CONTEXT_TABLE_NAME, self.eng)
+        definition_context_dataframe = definition_dataframe.merge(context_dataframe,
+                                                                  left_on='id',
+                                                                  right_on='definition_id',
+                                                                  how='inner')
+        grouped_dataframe = definition_context_dataframe[['url', 'context', 'id_y']].groupby("url")
+
+        cache = {url: pd.Series(group.id_y.values, index=group.context).to_dict() for url, group in
+                 grouped_dataframe}
+
+        ns_c = {}
+        a_c = {}
+
+        for definition_url in cache:
+            if definition_url.endswith('.belns'):
+                ns_c[definition_url] = cache[definition_url]
+            elif definition_url.endswith('.belanno'):
+                a_c[definition_url] = cache[definition_url]
+
+        return {'namespace_cache': ns_c, 'annotation_cache': a_c}
+
     def setup_database(self, drop_existing=False):
         """Sets the database with the needed tables.
 
@@ -293,3 +317,18 @@ class DefinitionCacheManager:
                 del self.namespace_cache[definition_url]
             elif definition_type == DEFINITION_ANNOTATION:
                 del self.annotation_cache[definition_url]
+
+    def get_definition_info(self, definition_url):
+        definition = self.sesh.query(database_models.Definition).filter_by(url=definition_url).first()
+        if definition:
+            return {
+                'id': definition.id,
+                'keyword': definition.keyword,
+                'version': definition.version,
+                'url': definition.url,
+                'createdDateTime': definition.createdDateTime,
+                'pubDate': definition.pubDate,
+                'copyright': definition.copyright,
+                'author': definition.author,
+                'contact': definition.contact
+            }

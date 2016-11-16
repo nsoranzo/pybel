@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Table, Binary
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Date, Table, Binary, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -12,7 +12,8 @@ TERM_TABLE_NAME = 'pybel_term'
 STATEMENT_TABLE_NAME = 'pybel_statement'
 MODIFICATION_TABLE_NAME = 'pybel_modification'
 EDGEPROPERTY_TABLE_NAME = 'pybel_property'
-GRAPH_TABLE_NAME = 'pyel_graph_store'
+GRAPH_TABLE_NAME = 'pybel_graphstore'
+CITATION_TABLE_NAME = 'pybel_citation'
 
 Base = declarative_base()
 
@@ -67,18 +68,21 @@ class BELTerm(Base):
     __tablename__ = TERM_TABLE_NAME
 
     id = Column(Integer, primary_key=True)
-    function_id = Column(Integer, ForeignKey('{}.id'.format(FUNCTION_TABLE_NAME)))
+    #function_id = Column(Integer, ForeignKey('{}.id'.format(FUNCTION_TABLE_NAME)))
+    function = Column(String(255))
     nsContext_id = Column(Integer, ForeignKey('{}.id'.format(CONTEXT_TABLE_NAME)))
-    modification_id = Column(Integer, ForeignKey('{}.id'.format(MODIFICATION_TABLE_NAME)))
+    #modification_id = Column(Integer, ForeignKey('{}.id'.format(MODIFICATION_TABLE_NAME)))
 
 
 class BELStatement(Base):
     __tablename__ = STATEMENT_TABLE_NAME
 
     id = Column(Integer, primary_key=True)
+    inGraphId = Column(String(100))
     subject_id = Column(Integer, ForeignKey('{}.id'.format(TERM_TABLE_NAME)))
     relation = Column(String(50))
     object_id = Column(Integer, ForeignKey('{}.id'.format(TERM_TABLE_NAME)))
+    #citation_id = Column(Integer, ForeignKey('{}.id'.format(CITATION_TABLE_NAME)))
     subject = relationship("BELTerm", foreign_keys=[subject_id])
     object = relationship("BELTerm", foreign_keys=[object_id])
     properties = relationship("BELEdgeProperty",
@@ -93,6 +97,27 @@ class BELEdgeProperty(Base):
     propKey = Column(String(255))
     relativeKey = Column(String(255))
     propValue = Column(String(255))
+
+
+class BELCitation(Base):
+    __tablename__ = CITATION_TABLE_NAME
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255))
+    citationType = Column(String(100))
+    comment = Column(Text)
+    journal = Column(Text, nullable=True)
+    volume = Column(String(255), nullable=True)
+    issue = Column(String(255), nullable=True)
+    pages = Column(String(255), nullable=True)
+    pmcId = Column(String(255), nullable=True)
+    firstauthor = Column(Text, nullable=True)
+    authors = Column(Text, nullable=True)
+    title = Column(Text, nullable=True)
+    pubdate = Column(Date, nullable=True)
+    lastauthor = Column(String(255), nullable=True, index=True)
+    date = Column(Date, nullable=True)
+    reference = Column(String(100))
 
 
 class PyBELGraphStore(Base):
