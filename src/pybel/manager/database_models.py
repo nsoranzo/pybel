@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Date, Table, Binary, Text
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Date, Table, Binary, Text, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -12,6 +12,7 @@ TERM_TABLE_NAME = 'pybel_term'
 STATEMENT_TABLE_NAME = 'pybel_statement'
 MODIFICATION_TABLE_NAME = 'pybel_modification'
 EDGEPROPERTY_TABLE_NAME = 'pybel_property'
+STATEMENT_PROPERTIES_TABLE_NAME = 'pybel_statement_properties'
 GRAPH_TABLE_NAME = 'pybel_graphstore'
 CITATION_TABLE_NAME = 'pybel_citation'
 
@@ -56,47 +57,57 @@ class BELModification(Base):
     __tablename__ = MODIFICATION_TABLE_NAME
 
     id = Column(Integer, primary_key=True)
-
-
-association_table = Table('pybel_statement_properties', Base.metadata,
-                          Column('statement_id', Integer, ForeignKey('{}.id'.format(STATEMENT_TABLE_NAME))),
-                          Column('property_id', Integer, ForeignKey('{}.id'.format(EDGEPROPERTY_TABLE_NAME)))
-                          )
+    modType = Column(String(255))
 
 
 class BELTerm(Base):
     __tablename__ = TERM_TABLE_NAME
 
-    id = Column(Integer, primary_key=True)
-    #function_id = Column(Integer, ForeignKey('{}.id'.format(FUNCTION_TABLE_NAME)))
+    # ToDO: Unique für function+nsContext_id
+    graphKey = Column(String(255), index=True, primary_key=True)
     function = Column(String(255))
-    nsContext_id = Column(Integer, ForeignKey('{}.id'.format(CONTEXT_TABLE_NAME)))
+    nsContext_id = Column(Integer, ForeignKey('{}.id'.format(CONTEXT_TABLE_NAME)), nullable=True)
+
+    __table_args__ = (UniqueConstraint('function', 'nsContext_id', name='_function_context_uc'),)
+    # ToDo: Add Modification key
     #modification_id = Column(Integer, ForeignKey('{}.id'.format(MODIFICATION_TABLE_NAME)))
+
+
+class BELStatementPropertyAssociation(Base):
+    __tablename__ = STATEMENT_PROPERTIES_TABLE_NAME
+
+    id = Column(Integer, primary_key=True)
+    statement_id = Column(Integer, ForeignKey('{}.id'.format(STATEMENT_TABLE_NAME)))
+    property_id = Column(Integer, ForeignKey('{}.id'.format(EDGEPROPERTY_TABLE_NAME)))
+
+    property = relationship("BELEdgeProperty", back_populates="statements")
+    statement = relationship("BELStatement", back_populates="properties")
 
 
 class BELStatement(Base):
     __tablename__ = STATEMENT_TABLE_NAME
 
     id = Column(Integer, primary_key=True)
-    inGraphId = Column(String(100))
-    subject_id = Column(Integer, ForeignKey('{}.id'.format(TERM_TABLE_NAME)))
+    subject_id = Column(Integer, ForeignKey('{}.graphKey'.format(TERM_TABLE_NAME)))
     relation = Column(String(50))
-    object_id = Column(Integer, ForeignKey('{}.id'.format(TERM_TABLE_NAME)))
-    #citation_id = Column(Integer, ForeignKey('{}.id'.format(CITATION_TABLE_NAME)))
+    object_id = Column(Integer, ForeignKey('{}.graphKey'.format(TERM_TABLE_NAME)))
+    citation_id = Column(Integer, ForeignKey('{}.id'.format(CITATION_TABLE_NAME)), nullable=True)
     subject = relationship("BELTerm", foreign_keys=[subject_id])
     object = relationship("BELTerm", foreign_keys=[object_id])
-    properties = relationship("BELEdgeProperty",
-                              secondary=association_table,
-                              backref="statements")
+    properties = relationship("BELStatementPropertyAssociation", back_populates="statement")
+    #properties = relationship("BELEdgeProperty",
+    #                          secondary=association_table,
+    #                          backref="statements")
 
 
 class BELEdgeProperty(Base):
     __tablename__ = EDGEPROPERTY_TABLE_NAME
 
     id = Column(Integer, primary_key=True)
-    propKey = Column(String(255))
-    relativeKey = Column(String(255))
+    propKey = Column(String(255), nullable=True)
+    relativeKey = Column(String(255), nullable=True)
     propValue = Column(String(255))
+    statements = relationship("BELStatementPropertyAssociation", back_populates="property")
 
 
 class BELCitation(Base):
@@ -105,7 +116,8 @@ class BELCitation(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(255))
     citationType = Column(String(100))
-    comment = Column(Text)
+    reference = Column(String(100))
+    comment = Column(Text, nullable=True)
     journal = Column(Text, nullable=True)
     volume = Column(String(255), nullable=True)
     issue = Column(String(255), nullable=True)
@@ -117,7 +129,6 @@ class BELCitation(Base):
     pubdate = Column(Date, nullable=True)
     lastauthor = Column(String(255), nullable=True, index=True)
     date = Column(Date, nullable=True)
-    reference = Column(String(100))
 
 
 class PyBELGraphStore(Base):

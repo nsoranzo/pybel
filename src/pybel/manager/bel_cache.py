@@ -1,12 +1,15 @@
 import logging
 import os
 import _pickle, time
+import pandas as pd
 
+from copy import deepcopy
 from sqlalchemy import create_engine, exists
 from sqlalchemy.orm import sessionmaker, scoped_session
 
 from . import database_models
-from . import namespace_cache as defManager
+from .namespace_cache import DefinitionCacheManager
+from .. import graph as PyBEL_Graph
 from .. import utils
 
 log = logging.getLogger('pybel')
@@ -23,8 +26,24 @@ class BelDataManager:
 
         self.eng = create_engine(conn, echo=log_sql)
         self.sesh = scoped_session(sessionmaker(bind=self.eng, autoflush=False, expire_on_commit=False))
-        self.definitionCacheManager = definition_cache_manager if definition_cache_manager else defManager.DefinitionCacheManager(
+        self.definitionCacheManager = definition_cache_manager if definition_cache_manager else DefinitionCacheManager(
             setup_default_cache=setup_default_cache)
+
+        self.citation_cache = {}
+        self.attribute_cache = {}
+        self.statement_cache = {}
+
+        self.setup_caches()
+
+    def setup_caches(self):
+        citation_dataframe = pd.read_sql_table(database_models.CITATION_TABLE_NAME, self.eng).groupby('citationType')
+        attributes_dataframe = pd.read_sql_table(database_models.EDGEPROPERTY_TABLE_NAME, self.eng).groupby('propKey')
+
+        statement_attrib_dataframe = pd.read_sql_table(database_models.STATEMENT_PROPERTIES_TABLE_NAME, self.eng).groupby('statement_id')
+        self.statement_cache = {statement_id: set(group.property_id.values) for statement_id, group in statement_attrib_dataframe}
+
+        self.citation_cache = {citType: pd.Series(group.id.values, index=group.reference).to_dict() for citType, group in citation_dataframe}
+        self.attribute_cache = {propKey: pd.Series(group.id.values, index=group.propValue).to_dict() for propKey, group in attributes_dataframe}
 
     def store_graph(self, pybel_graph, graph_label, graph_name=None, extract_information=True):
         """Stores PyBEL Graph object into given database.
@@ -41,14 +60,13 @@ class BelDataManager:
         :type extract_information: bool
 
         """
-        # ToDo: Do the pickling here!
         if self.sesh.query(exists().where(database_models.PyBELGraphStore.label == graph_label)).scalar():
             logging.error("A graph with the label '{}' allready exists in the graph-store!".format(graph_label))
         else:
             pyGraph_data = {
                 'name': graph_name,
                 'label': graph_label,
-                'graph': _pickle.dumps(utils.flatten_edges(pybel_graph))
+                'graph': _pickle.dumps(utils.flatten_graph_data(pybel_graph))
             }
             self.eng.execute(database_models.PyBELGraphStore.__table__.insert(), pyGraph_data)
         self.extract_information(pybel_graph)
@@ -62,12 +80,68 @@ class BelDataManager:
         """
         graph_data = self.sesh.query(database_models.PyBELGraphStore).filter_by(label=graph_label).first()
         if graph_data:
-            return utils.expand_edges(_pickle.loads(graph_data.graph))
+            return PyBEL_Graph.expand_edges(_pickle.loads(graph_data.graph))
 
         else:
-            logging.error("Graph with label '{}' does not exist. Use 'show_stored_graphs()' to get a list of all stored Graph-Labels.".format(graph_label))
+            logging.error(
+                "Graph with label '{}' does not exist. Use 'show_stored_graphs()' to get a list of all stored Graph-Labels.".format(
+                    graph_label))
 
-    def extract_information(self, pybel_graph, graph_id=None):
+    def __store_list(self, list_node):
+        node_id = None
+        return node_id
+
+    def __store_attributes(self, attributes):
+        """Loads attributes of edge into relational database.
+
+        :param edge_attributes: Edge attributes.
+        :type edge_attributes: dict
+
+        :returns: Tuple with citation_id and list of attribute ids."""
+        edge_attributes = deepcopy(attributes)
+        citation_id = None
+        attribute_ids = []
+
+        if 'citation' in edge_attributes:
+            citation_data = edge_attributes['citation']
+            citation_type = citation_data['type']
+            citation_ref = citation_data['reference']
+            del (edge_attributes['citation'])
+
+            if not citation_type in self.citation_cache or citation_type in self.citation_cache and citation_ref not in self.citation_cache[citation_type]:
+                citation = self.get_or_create(database_models.BELCitation, {
+                    'citationType': citation_type,
+                    'reference': citation_ref,
+                    'name': citation_data['name'],
+                    # ToDo: add citation enrichtment
+                })
+                citation_id = citation[0].id
+                if citation_type not in self.citation_cache:
+                    self.citation_cache[citation_type] = {citation_ref: citation_id}
+                else:
+                    self.citation_cache[citation_type][citation_ref] = citation_id
+
+            citation_id = self.citation_cache[citation_type][citation_ref]
+
+        for attribute_key, attribute_value in edge_attributes.items():
+            # ToDo: Solve this hack with propper representation of subject and object related attributes
+            attribute_value = str(attribute_value)
+            if attribute_key not in self.attribute_cache or attribute_key in self.attribute_cache and attribute_value not in self.attribute_cache[attribute_key]:
+                attribute = self.get_or_create(database_models.BELEdgeProperty, {
+                    'propKey': attribute_key,
+                    'propValue': attribute_value
+                })
+                attribute_id = attribute[0].id
+                if attribute_key not in self.attribute_cache:
+                    self.attribute_cache[attribute_key] = {attribute_value: attribute_id}
+                else:
+                    self.attribute_cache[attribute_key][attribute_value] = attribute_id
+
+            attribute_ids.append(self.attribute_cache[attribute_key][attribute_value])
+
+        return citation_id, attribute_ids
+
+    def extract_information(self, pybel_graph):
         """Extracts BEL information from PyBEL Graph object and inserts it into relational database schema.
 
         :param pybel_graph: PyBEL Graph object that contains the information to store.
@@ -79,22 +153,20 @@ class BelDataManager:
         namespace_dict = {}
         st = time.time()
         for namespace_url in namespace_id_cache:
-            try:
-                def_info = self.definitionCacheManager.get_definition_info(namespace_url)
-                keyword = def_info['keyword']
-            except:
-                print(namespace_url)
+            def_info = self.definitionCacheManager.get_definition_info(namespace_url)
+            keyword = def_info['keyword']
             if keyword not in namespace_dict:
                 namespace_dict[keyword] = def_info
 
-            # ToDo: Clarify handling of multiple namespaces (different pub dates)
-            #elif len(namespace_dict[keyword]) == 1:
-            #    namespace_dict[keyword] = {
-            #        namespace_dict[keyword]['url']: namespace_dict[keyword],
-            #        def_info['url']: def_info
-            #    }
-            #else:
-            #    namespace_dict[keyword][def_info['url']] = def_info
+
+                # ToDo: Clarify handling of multiple namespaces (different pub dates)
+                # elif len(namespace_dict[keyword]) == 1:
+                #    namespace_dict[keyword] = {
+                #        namespace_dict[keyword]['url']: namespace_dict[keyword],
+                #        def_info['url']: def_info
+                #    }
+                # else:
+                #    namespace_dict[keyword][def_info['url']] = def_info
 
         node_db = {}
         edge_db = {}
@@ -103,46 +175,64 @@ class BelDataManager:
             if node_key not in node_db:
                 if 'namespace' in node_data:
                     nsv_id = namespace_id_cache[namespace_dict[node_data['namespace']]['url']][node_data['name']]
-                    insert_values = [{'function': node_data['type'], 'nsContext_id': nsv_id}]
-                    term_data = self.eng.execute(database_models.BELTerm.__table__.insert(), insert_values)
-                    node_db[node_key] = term_data.inserted_primary_key[0]
+                    insert_values = {
+                        'function': node_data['type'],
+                        'nsContext_id': int(nsv_id),
+                        'graphKey': str(node_key)
+                    }
+                    term_data = self.get_or_create(database_models.BELTerm, insert_values)
+                    node_db[node_key] = term_data[0].graphKey
+                elif node_data['type'] in ('Complex', 'Composite', 'Reaction'):
+                    pass
+                elif node_data['type'] == 'ProteinVariant':
+                    pass
 
         for sub, obj, identifier, data in pybel_graph.edges_iter(data=True, keys=True):
+            edge_data = deepcopy(data)
+            ob_type = obj[0]
+            su_type = sub[0]
+            relation = edge_data['relation']
+            del (edge_data['relation'])
+            #if 'citation' in edge_data:
+            citation_id, attribute_ids = self.__store_attributes(edge_data)
 
-            if (sub, obj) not in edge_db:
+            if su_type not in ('Complex', 'Reaction','Composite') and ob_type not in ('Complex', 'Reaction', 'Composite') and (sub, obj) not in edge_db:
                 sub_id = node_db[sub]
                 obj_id = node_db[obj]
 
-                property_insert_values = []
-                property_ids = []
+                statement_insert_values = {
+                    'subject_id': str(sub),
+                    'object_id': str(obj),
+                    'relation': relation,
+                }
 
-                for property in data:
-                    property_insert_values.append({
-                        'propKey': property,
-                        'propValue': str(data[property]),
-                    })
+                statement = self.get_or_create(database_models.BELStatement, statement_insert_values)
 
-                for pro in property_insert_values:
-                    props = self.eng.execute(database_models.BELEdgeProperty.__table__.insert(), [pro])
-                    prop_id = props.inserted_primary_key[0]
-                    property_ids.append(prop_id)
+                statement_id = statement[0].id
 
-                statement_insert_values = [{
-                    'subject_id': sub_id,
-                    'object_id': obj_id,
-                    'relation': data['relation'],
-                }]
+                if statement[1] or statement_id not in self.statement_cache:
+                    self.statement_cache[statement_id] = set()
 
-                statement = self.eng.execute(database_models.BELStatement.__table__.insert(), statement_insert_values)
-                statement_id = statement.inserted_primary_key[0]
-
-                edge_db[(sub, obj)] = statement_id
-
-                self.eng.execute(database_models.association_table.insert(), [{'statement_id': statement_id, 'property_id': property_id} for property_id in property_ids])
-
-        print("INFO:", time.time()-st)
+                if attribute_ids:
+                    for attribute_id in attribute_ids:
+                        if attribute_id not in self.statement_cache[statement_id]:
+                            self.get_or_create(database_models.BELStatementPropertyAssociation, {
+                                'statement_id': statement_id,
+                                'property_id': attribute_id
+                            })
+                            self.statement_cache[statement_id].add(attribute_id)
 
     def show_stored_graphs(self):
         """Shows stored graphs in relational database."""
         stored_graph_label = self.sesh.query(database_models.PyBELGraphStore.label).distinct().all()
         return [g_label for labels_listed in stored_graph_label for g_label in labels_listed]
+
+    def get_or_create(self, database_model, insert_dict):
+        instance = self.sesh.query(database_model).filter_by(**insert_dict).first()
+        if instance:
+            return instance, False
+        else:
+            instance = database_model(**insert_dict)
+            self.sesh.add(instance)
+            self.sesh.commit()
+            return instance, True
