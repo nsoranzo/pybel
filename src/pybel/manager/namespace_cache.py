@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, exists
 from sqlalchemy.orm import sessionmaker, scoped_session
 
 from . import database_models
-from .database_models import DEFINITION_TABLE_NAME, CONTEXT_TABLE_NAME, DEFINITION_ANNOTATION, DEFINITION_NAMESPACE
+from .database_models import DEFINITION_TABLE_NAME, NAME_TABLE_NAME, DEFINITION_ANNOTATION, DEFINITION_NAMESPACE
 from .defaults import default_namespaces, default_annotations
 from .. import utils
 
@@ -124,22 +124,22 @@ class DefinitionCacheManager:
         definition_entry = self.eng.execute(database_models.Definition.__table__.insert(), definition_insert_values)
         definition_pk = definition_entry.inserted_primary_key[0]
 
-        context_insert_values = [{'definition_id': definition_pk, 'context': name, 'encoding': encoding} for
+        context_insert_values = [{'definition_id': definition_pk, 'name': name, 'encoding': encoding} for
                                  name, encoding in contexts_dict.items()]
 
-        self.eng.execute(database_models.Context.__table__.insert(), context_insert_values)
+        self.eng.execute(database_models.Name.__table__.insert(), context_insert_values)
 
     def __cached_definitions(self):
         """Creates the namespace and annotation caches"""
         definition_dataframe = pd.read_sql_table(DEFINITION_TABLE_NAME, self.eng)
-        context_dataframe = pd.read_sql_table(CONTEXT_TABLE_NAME, self.eng)
+        context_dataframe = pd.read_sql_table(NAME_TABLE_NAME, self.eng)
         definition_context_dataframe = definition_dataframe.merge(context_dataframe,
                                                                   left_on='id',
                                                                   right_on='definition_id',
                                                                   how='inner')
-        grouped_dataframe = definition_context_dataframe[['url', 'context', 'encoding']].groupby("url")
+        grouped_dataframe = definition_context_dataframe[['url', 'name', 'encoding']].groupby("url")
 
-        cache = {url: pd.Series(group.encoding.values, index=group.context).to_dict() for url, group in
+        cache = {url: pd.Series(group.encoding.values, index=group.name).to_dict() for url, group in
                  grouped_dataframe}
 
         for definition_url in cache:
@@ -151,14 +151,14 @@ class DefinitionCacheManager:
     def get_cache_with_id(self):
         """Creates the namespace and annotation caches that contain ids"""
         definition_dataframe = pd.read_sql_table(DEFINITION_TABLE_NAME, self.eng)
-        context_dataframe = pd.read_sql_table(CONTEXT_TABLE_NAME, self.eng)
+        context_dataframe = pd.read_sql_table(NAME_TABLE_NAME, self.eng)
         definition_context_dataframe = definition_dataframe.merge(context_dataframe,
                                                                   left_on='id',
                                                                   right_on='definition_id',
                                                                   how='inner')
-        grouped_dataframe = definition_context_dataframe[['url', 'context', 'id_y']].groupby("url")
+        grouped_dataframe = definition_context_dataframe[['url', 'name', 'id_y']].groupby("url")
 
-        cache = {url: pd.Series(group.id_y.values, index=group.context).to_dict() for url, group in
+        cache = {url: pd.Series(group.id_y.values, index=group.name).to_dict() for url, group in
                  grouped_dataframe}
 
         ns_c = {}

@@ -151,7 +151,7 @@ class BelDataManager:
         node_type = node_data['type']
         node_dict = {
             'function': node_type,
-            'nodeHash': nodeHash,
+            'nodeHash': str(nodeHash),
         }
 
         if node_type not in ('Complex', 'Composite', 'Reaction'):
@@ -248,7 +248,7 @@ class BelDataManager:
             for attribute_key, attribute_value in attribute_data.items():
                 attribute_dict = {
                     'propKey': attribute_key,
-                    'propValue': attribute_value
+                    'propValue': str(attribute_value)
                 }
                 attribute = self.get_or_create(database_models.Property, attribute_dict)
 
