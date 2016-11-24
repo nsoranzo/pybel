@@ -1,18 +1,18 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Date, Table, Binary, Text, UniqueConstraint
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Date, Binary, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
-DEFINITION_TABLE_NAME = 'pybel_cache_definition'
-CONTEXT_TABLE_NAME = 'pybel_cache_context'
+DEFINITION_TABLE_NAME = 'pybel_definition'
+NAME_TABLE_NAME = 'pybel_name'
 DEFINITION_NAMESPACE = 'N'
 DEFINITION_ANNOTATION = 'A'
 
 FUNCTION_TABLE_NAME = 'pybel_function'
-TERM_TABLE_NAME = 'pybel_term'
-STATEMENT_TABLE_NAME = 'pybel_statement'
+NODE_TABLE_NAME = 'pybel_node'
+EDGE_TABLE_NAME = 'pybel_edge'
 MODIFICATION_TABLE_NAME = 'pybel_modification'
-EDGEPROPERTY_TABLE_NAME = 'pybel_property'
-STATEMENT_PROPERTIES_TABLE_NAME = 'pybel_statement_properties'
+PROPERTY_TABLE_NAME = 'pybel_property'
+EDGE_PROPERTIES_TABLE_NAME = 'pybel_edge_properties'
 GRAPH_TABLE_NAME = 'pybel_graphstore'
 CITATION_TABLE_NAME = 'pybel_citation'
 
@@ -33,84 +33,82 @@ class Definition(Base):
     copyright = Column(String(255))
     version = Column(String(50))
     contact = Column(String(255))
-    contexts = relationship("Context", cascade='delete, delete-orphan')
+    names = relationship("Name", cascade='delete, delete-orphan')
 
 
-class Context(Base):
+class Name(Base):
     """This table represents the one-to-many relationship between a BEL Namespace/annotation, its values, and their semantic annotations"""
-    __tablename__ = CONTEXT_TABLE_NAME
+    __tablename__ = NAME_TABLE_NAME
 
     id = Column(Integer, primary_key=True)
     definition_id = Column(Integer, ForeignKey('{}.id'.format(DEFINITION_TABLE_NAME)), index=True)
-    context = Column(String(255))
+    name = Column(String(255))
     encoding = Column(String(50))
 
-
-class BELFunction(Base):
-    __tablename__ = FUNCTION_TABLE_NAME
-
-    id = Column(Integer, primary_key=True)
-    name = Column(String(255), unique=True)
+    definition = relationship("Definition", back_populates='names')
 
 
-class BELModification(Base):
+class Modification(Base):
     __tablename__ = MODIFICATION_TABLE_NAME
 
     id = Column(Integer, primary_key=True)
     modType = Column(String(255))
 
 
-class BELTerm(Base):
-    __tablename__ = TERM_TABLE_NAME
+class Node(Base):
+    __tablename__ = NODE_TABLE_NAME
 
-    # ToDO: Unique für function+nsContext_id
-    graphKey = Column(String(255), index=True, primary_key=True)
+    id = Column(Integer, primary_key=True)
     function = Column(String(255))
-    nsContext_id = Column(Integer, ForeignKey('{}.id'.format(CONTEXT_TABLE_NAME)), nullable=True)
+    nodeIdentifier_id = Column(Integer, ForeignKey('{}.id'.format(NAME_TABLE_NAME)), nullable=True)
+    # modification_id = Column(Integer, ForeignKey('{}.id'.format(MODIFICATION_TABLE_NAME)))
+    nodeHash = Column(String(255), index=True)
 
-    __table_args__ = (UniqueConstraint('function', 'nsContext_id', name='_function_context_uc'),)
+    # __table_args__ = (UniqueConstraint('function', 'nodeIdentifier_id', name='_function_name_uc'),)
     # ToDo: Add Modification key
     #modification_id = Column(Integer, ForeignKey('{}.id'.format(MODIFICATION_TABLE_NAME)))
 
 
-class BELStatementPropertyAssociation(Base):
-    __tablename__ = STATEMENT_PROPERTIES_TABLE_NAME
+class AssociationEdgeProperty(Base):
+    __tablename__ = EDGE_PROPERTIES_TABLE_NAME
 
     id = Column(Integer, primary_key=True)
-    statement_id = Column(Integer, ForeignKey('{}.id'.format(STATEMENT_TABLE_NAME)))
-    property_id = Column(Integer, ForeignKey('{}.id'.format(EDGEPROPERTY_TABLE_NAME)))
+    edge_id = Column(Integer, ForeignKey('{}.id'.format(EDGE_TABLE_NAME)))
+    property_id = Column(Integer, ForeignKey('{}.id'.format(PROPERTY_TABLE_NAME)))
 
-    property = relationship("BELEdgeProperty", back_populates="statements")
-    statement = relationship("BELStatement", back_populates="properties")
+    property = relationship("Property", back_populates="statements")
+    edge = relationship("Edge", back_populates="properties")
 
 
-class BELStatement(Base):
-    __tablename__ = STATEMENT_TABLE_NAME
+class Edge(Base):
+    __tablename__ = EDGE_TABLE_NAME
 
     id = Column(Integer, primary_key=True)
-    subject_id = Column(Integer, ForeignKey('{}.graphKey'.format(TERM_TABLE_NAME)))
+    subject_id = Column(Integer, ForeignKey('{}.id'.format(NODE_TABLE_NAME)))
     relation = Column(String(50))
-    object_id = Column(Integer, ForeignKey('{}.graphKey'.format(TERM_TABLE_NAME)))
+    object_id = Column(Integer, ForeignKey('{}.id'.format(NODE_TABLE_NAME)))
     citation_id = Column(Integer, ForeignKey('{}.id'.format(CITATION_TABLE_NAME)), nullable=True)
-    subject = relationship("BELTerm", foreign_keys=[subject_id])
-    object = relationship("BELTerm", foreign_keys=[object_id])
-    properties = relationship("BELStatementPropertyAssociation", back_populates="statement")
-    #properties = relationship("BELEdgeProperty",
+    supportingText = Column(Text, nullable=True)
+
+    subject = relationship("Node", foreign_keys=[subject_id])
+    object = relationship("Node", foreign_keys=[object_id])
+    properties = relationship("AssociationEdgeProperty", back_populates="edge")
+    #properties = relationship("Property",
     #                          secondary=association_table,
     #                          backref="statements")
 
 
-class BELEdgeProperty(Base):
-    __tablename__ = EDGEPROPERTY_TABLE_NAME
+class Property(Base):
+    __tablename__ = PROPERTY_TABLE_NAME
 
     id = Column(Integer, primary_key=True)
     propKey = Column(String(255), nullable=True)
     relativeKey = Column(String(255), nullable=True)
     propValue = Column(String(255))
-    statements = relationship("BELStatementPropertyAssociation", back_populates="property")
+    statements = relationship("AssociationEdgeProperty", back_populates="property")
 
 
-class BELCitation(Base):
+class Citation(Base):
     __tablename__ = CITATION_TABLE_NAME
 
     id = Column(Integer, primary_key=True)
