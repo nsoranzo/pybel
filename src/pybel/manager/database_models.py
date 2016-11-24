@@ -104,7 +104,9 @@ class Property(Base):
     id = Column(Integer, primary_key=True)
     propKey = Column(String(255), nullable=True)
     relativeKey = Column(String(255), nullable=True)
-    propValue = Column(String(255))
+    relativeKeyLvl2 = Column(String(255), nullable=True)
+    tlocIdentifier_id = Column(Integer, ForeignKey('{}.id'.format(NAME_TABLE_NAME)), nullable=True)
+    propValue = Column(String(255), nullable=True)
     statements = relationship("AssociationEdgeProperty", back_populates="property")
 
 
@@ -133,6 +135,6 @@ class PyBELGraphStore(Base):
     __tablename__ = GRAPH_TABLE_NAME
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(255), nullable=True)
-    label = Column(String(25))
+    description = Column(Text, nullable=True)
+    label = Column(String(25), index=True, unique=True)
     graph = Column(Binary)

@@ -49,15 +49,15 @@ class BelDataManager:
         self.citation_cache = {citType: pd.Series(group.id.values, index=group.reference).to_dict() for citType, group in citation_dataframe}
         self.attribute_cache = {propKey: pd.Series(group.id.values, index=group.propValue).to_dict() for propKey, group in attributes_dataframe}
 
-    def store_graph(self, pybel_graph, graph_label, graph_name=None, extract_information=True):
+    def store_graph(self, pybel_graph, graph_label, graph_description=None, extract_information=True):
         """Stores PyBEL Graph object into given database.
 
         :param pybel_graph: PyBEL Graph object to store in database.
 
         :param graph_label: Label that should be used to identify the stored Graph.
         :type graph_label: str
-        :param graph_name: Long name for the stored Graph.
-        :type graph_name: str
+        :param graph_description: Description of the stored graph.
+        :type graph_description: str
 
         :param extract_information: Indicates if BEL information should be extracted from PyBEL Graph object and
         stored into relational database schema.
@@ -68,7 +68,7 @@ class BelDataManager:
             logging.error("A graph with the label '{}' allready exists in the graph-store!".format(graph_label))
         else:
             pyGraph_data = {
-                'name': graph_name,
+                'description': graph_description,
                 'label': graph_label,
                 'graph': _pickle.dumps(utils.flatten_graph_data(pybel_graph))
             }
@@ -156,12 +156,15 @@ class BelDataManager:
 
         if node_type not in ('Complex', 'Composite', 'Reaction'):
             node_dict.update({
-                'nodeIdentifier_id': self.namespace_id_cache[namespace_dict[node_data['namespace']]['url']][
-                    node_data['name']],
+                'nodeIdentifier_id': int(self.namespace_id_cache[namespace_dict[node_data['namespace']]['url']][
+                    node_data['name']]),
             })
 
         return self.get_or_create(database_models.Node, node_dict)
-
+    
+    def get_namespaceNameId(self, namespace_dict, data):
+        return int(self.namespace_id_cache[namespace_dict[data['namespace']]['url']][data['name']])
+    
     def extract_information(self, pybel_graph):
         """Extracts BEL information from PyBEL Graph object and inserts it into relational database schema.
 
@@ -189,7 +192,7 @@ class BelDataManager:
                 # else:
                 #    namespace_dict[keyword][def_info['url']] = def_info
 
-        # node_db = {}
+        # node_db = {(Hash):id}
         # edge_db = {}
 
         # for node_key, node_data in pybel_graph.nodes_iter(data=True):
@@ -212,6 +215,7 @@ class BelDataManager:
         for sub, obj, identifier, data in pybel_graph.edges_iter(data=True, keys=True):
             subject_node = self.store_node(sub, pybel_graph.node[sub], namespace_dict)
             object_node = self.store_node(obj, pybel_graph.node[obj], namespace_dict)
+            #ToDo: Evidence will be called supporting text in future!
             supporting_text = data['Evidence'] if 'Evidence' in data else None
             citation = None
 
@@ -236,23 +240,57 @@ class BelDataManager:
             # citation_id, attribute_ids = self.__store_attributes(edge_data)
 
             edge_dict = {
-                'subject_id': subject_node.id,
-                'object_id': object_node.id,
+                'subject_id': int(subject_node.id),
+                'object_id': int(object_node.id),
                 'relation': relation,
-                'citation_id': citation.id if citation else citation,
+                'citation_id': int(citation.id) if citation else citation,
                 'supportingText': supporting_text
             }
 
             edge = self.get_or_create(database_models.Edge, edge_dict)
 
             for attribute_key, attribute_value in attribute_data.items():
-                attribute_dict = {
-                    'propKey': attribute_key,
-                    'propValue': str(attribute_value)
-                }
-                attribute = self.get_or_create(database_models.Property, attribute_dict)
-
-                edge.properties.append(attribute)
+                attributes = []
+                if attribute_key in ('subject', 'object'):
+                   
+                    if attribute_value['modifier'] == 'Activity':
+                        attribute_dict = {
+                            'propKey': attribute_key,
+                            'relativeKey': attribute_value['modifier'],
+                            'propValue': attribute_value['effect']['MolecularActivity']
+                        }
+                        attributes.append(self.get_or_create(database_models.Property, attribute_dict))
+                   
+                    elif attribute_value['modifier'] == 'Translocation':
+                        for tloc_info, tloc_data in attribute_value['effect'].items():
+                            attribute_dict = {
+                                'propKey': attribute_key,
+                                'relativeKey': attribute_value['modifier'],
+                                'relativeKeyLvl2': tloc_info,
+                                'propValue': '{}:{}'.format(tloc_data['namespace'],tloc_data['name'])
+                            }
+                            attributes.append(self.get_or_create(database_models.Property, attribute_dict))
+                    
+                    else:
+                        attribute_dict = {
+                            'propKey':attribute_key,
+                            'relativeKey': attribute_value['modifier']
+                        }
+                        attributes.append(self.get_or_create(database_models.Property, attribute_dict))
+                else:
+                    attribute_dict = {
+                        'propKey': attribute_key,
+                        'propValue': str(attribute_value)
+                    }
+                    attributes.append(self.get_or_create(database_models.Property, attribute_dict))
+                
+                for attribute in attributes:
+                    association_dict = {
+                        'edge_id': int(edge.id),
+                        'property_id': int(attribute.id),
+                    }
+                    #ToDo: Do auto association table!
+                    self.get_or_create(database_models.AssociationEdgeProperty, association_dict)
 
             self.sesh.commit()
 
@@ -284,16 +322,16 @@ class BelDataManager:
 
     def show_stored_graphs(self):
         """Shows stored graphs in relational database."""
-        stored_graph_label = self.sesh.query(database_models.PyBELGraphStore.label).distinct().all()
+        stored_graph_label = self.sesh.query(database_models.PyBELGraphStore.label).all()
         return [g_label for labels_listed in stored_graph_label for g_label in labels_listed]
 
     def get_or_create(self, database_model, insert_dict):
         instance = self.sesh.query(database_model).filter_by(**insert_dict).first()
         if instance:
-            return instance, False
+            return instance
         else:
             instance = database_model(**insert_dict)
             self.sesh.add(instance)
             self.sesh.flush()
             #self.sesh.commit()
-            return instance, True
+            return instance

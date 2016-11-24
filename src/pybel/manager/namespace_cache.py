@@ -11,6 +11,7 @@ from . import database_models
 from .database_models import DEFINITION_TABLE_NAME, NAME_TABLE_NAME, DEFINITION_ANNOTATION, DEFINITION_NAMESPACE
 from .defaults import default_namespaces, default_annotations
 from .. import utils
+from unittest.mock import inplace
 
 log = logging.getLogger('pybel')
 
@@ -157,7 +158,7 @@ class DefinitionCacheManager:
                                                                   right_on='definition_id',
                                                                   how='inner')
         grouped_dataframe = definition_context_dataframe[['url', 'name', 'id_y']].groupby("url")
-
+        
         cache = {url: pd.Series(group.id_y.values, index=group.name).to_dict() for url, group in
                  grouped_dataframe}
 
