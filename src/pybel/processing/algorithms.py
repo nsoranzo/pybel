@@ -48,3 +48,8 @@ def add_inferred_edges(graph, relations):
     for relation in relations:
         for u, v in graph.edges_iter(relation=relation):
             graph.add_edge(v, u, key=unqualified_edge_code[relation], relation=inferred_inverse[relation])
+
+
+# TODO: Implement
+def add_inferred_two_way_edge(graph, u, v):
+    pass
