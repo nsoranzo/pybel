@@ -1,9 +1,16 @@
 """
-This file contains a dictionary of the default namespaces
-and URLs to load into a new PyBEL namespace store.
+This file contains the default paths and urls used by the cache manager and the bel data manager.
 
 See: https://wiki.openbel.org/display/BELNA/Namespaces+Overview
 """
+import os
+
+default_pybel_data = os.path.expanduser('~/.pybel/data')
+if not os.path.exists(default_pybel_data):
+    os.makedirs(default_pybel_data)
+
+DEFAULT_BEL_DATA_NAME = 'beldatacache.db'
+DEFAULT_BEL_DATA_LOCATION = os.path.join(default_pybel_data, DEFAULT_BEL_DATA_NAME)
 
 default_namespaces = [
     'http://resource.belframework.org/belframework/20150611/namespace/affy-probeset-ids.belns',

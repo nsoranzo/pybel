@@ -13,8 +13,12 @@ EDGE_TABLE_NAME = 'pybel_edge'
 MODIFICATION_TABLE_NAME = 'pybel_modification'
 PROPERTY_TABLE_NAME = 'pybel_property'
 EDGE_PROPERTIES_TABLE_NAME = 'pybel_edge_properties'
+EDGE_GRAPH_TABLE_NAME = 'pybel_edge_graphs'
+EDGE_ANNOTATIONS_TABLE_NAME = 'pybel_edge_annotations'
+NODE_MOD_TABLE_NAME = 'pybel_node_modifications'
 GRAPH_TABLE_NAME = 'pybel_graphstore'
 CITATION_TABLE_NAME = 'pybel_citation'
+EVIDENCE_TABLE_NAME = 'pybel_evidence'
 
 Base = declarative_base()
 
@@ -37,7 +41,8 @@ class Definition(Base):
 
 
 class Name(Base):
-    """This table represents the one-to-many relationship between a BEL Namespace/annotation, its values, and their semantic annotations"""
+    """This table represents the one-to-many relationship between a BEL Namespace/annotation, its values
+    and their semantic annotations"""
     __tablename__ = NAME_TABLE_NAME
 
     id = Column(Integer, primary_key=True)
@@ -48,11 +53,30 @@ class Name(Base):
     definition = relationship("Definition", back_populates='names')
 
 
+class AssociationNodeMod(Base):
+    __tablename__ = NODE_MOD_TABLE_NAME
+
+    id = Column(Integer, primary_key=True)
+    node_id = Column(Integer, ForeignKey('{}.id'.format(NODE_TABLE_NAME)))
+    modification_id = Column(Integer, ForeignKey('{}.id'.format(MODIFICATION_TABLE_NAME)))
+
+    node = relationship("Node", back_populates="modifications")
+    modification = relationship("Modification", back_populates="nodes")
+
+
 class Modification(Base):
     __tablename__ = MODIFICATION_TABLE_NAME
 
     id = Column(Integer, primary_key=True)
     modType = Column(String(255))
+    variantType = Column(String(2), nullable=True)
+    pmodName_id = Column(ForeignKey('{}.id'.format(NAME_TABLE_NAME)), nullable=True)
+    pmodName = Column(String(255), nullable=True)
+    aminoA = Column(String(3), nullable=True)
+    aminoB = Column(String(3), nullable=True)
+    position = Column(Integer, nullable=True)
+
+    nodes = relationship("AssociationNodeMod", back_populates="modification")
 
 
 class Node(Base):
@@ -61,12 +85,30 @@ class Node(Base):
     id = Column(Integer, primary_key=True)
     function = Column(String(255))
     nodeIdentifier_id = Column(Integer, ForeignKey('{}.id'.format(NAME_TABLE_NAME)), nullable=True)
-    # modification_id = Column(Integer, ForeignKey('{}.id'.format(MODIFICATION_TABLE_NAME)))
     nodeHash = Column(String(255), index=True)
 
-    # __table_args__ = (UniqueConstraint('function', 'nodeIdentifier_id', name='_function_name_uc'),)
-    # ToDo: Add Modification key
-    #modification_id = Column(Integer, ForeignKey('{}.id'.format(MODIFICATION_TABLE_NAME)))
+    modifications = relationship("AssociationNodeMod", back_populates="node")
+
+
+class AssociationEdgeGraph(Base):
+    __tablename__ = EDGE_GRAPH_TABLE_NAME
+
+    id = Column(Integer, primary_key=True)
+    edge_id = Column(Integer, ForeignKey('{}.id'.format(EDGE_TABLE_NAME)))
+    graph_id = Column(Integer, ForeignKey('{}.id'.format(GRAPH_TABLE_NAME)))
+
+    graph = relationship("Graphstore", back_populates="edges")
+    edge = relationship("Edge", back_populates="graphs")
+
+
+class AssociationEdgeAnnotation(Base):
+    __tablename__ = EDGE_ANNOTATIONS_TABLE_NAME
+
+    id = Column(Integer, primary_key=True)
+    edge_id = Column(Integer, ForeignKey('{}.id'.format(EDGE_TABLE_NAME)))
+    annotationName_id = Column(Integer, ForeignKey('{}.id'.format(NAME_TABLE_NAME)))  # nullable=True
+
+    edge = relationship("Edge", back_populates="annotations")
 
 
 class AssociationEdgeProperty(Base):
@@ -74,11 +116,9 @@ class AssociationEdgeProperty(Base):
 
     id = Column(Integer, primary_key=True)
     edge_id = Column(Integer, ForeignKey('{}.id'.format(EDGE_TABLE_NAME)))
-    property_id = Column(Integer, ForeignKey('{}.id'.format(PROPERTY_TABLE_NAME)))
+    attribute_id = Column(Integer, ForeignKey('{}.id'.format(PROPERTY_TABLE_NAME)))
 
-    property = relationship("Property", back_populates="statements")
-    edge = relationship("Edge", back_populates="properties")
-
+    edge = relationship("Edge", back_populates='attributes')
 
 class Edge(Base):
     __tablename__ = EDGE_TABLE_NAME
@@ -88,26 +128,24 @@ class Edge(Base):
     relation = Column(String(50))
     object_id = Column(Integer, ForeignKey('{}.id'.format(NODE_TABLE_NAME)))
     citation_id = Column(Integer, ForeignKey('{}.id'.format(CITATION_TABLE_NAME)), nullable=True)
-    supportingText = Column(Text, nullable=True)
+    supportingText_id = Column(Integer, ForeignKey('{}.id'.format(EVIDENCE_TABLE_NAME)), nullable=True)
 
     subject = relationship("Node", foreign_keys=[subject_id])
     object = relationship("Node", foreign_keys=[object_id])
-    properties = relationship("AssociationEdgeProperty", back_populates="edge")
-    #properties = relationship("Property",
-    #                          secondary=association_table,
-    #                          backref="statements")
+    annotations = relationship("AssociationEdgeAnnotation", back_populates="edge")
+    attributes = relationship("AssociationEdgeProperty", back_populates="edge")
+    graphs = relationship("AssociationEdgeGraph", back_populates="edge")
 
 
 class Property(Base):
     __tablename__ = PROPERTY_TABLE_NAME
 
     id = Column(Integer, primary_key=True)
-    propKey = Column(String(255), nullable=True)
+    participant = Column(String(255))
+    modifier = Column(String(255))
     relativeKey = Column(String(255), nullable=True)
-    relativeKeyLvl2 = Column(String(255), nullable=True)
-    tlocIdentifier_id = Column(Integer, ForeignKey('{}.id'.format(NAME_TABLE_NAME)), nullable=True)
     propValue = Column(String(255), nullable=True)
-    statements = relationship("AssociationEdgeProperty", back_populates="property")
+    name_id = Column(Integer, ForeignKey('{}.id'.format(NAME_TABLE_NAME)), nullable=True)
 
 
 class Citation(Base):
@@ -131,10 +169,20 @@ class Citation(Base):
     date = Column(Date, nullable=True)
 
 
-class PyBELGraphStore(Base):
+class Evidence(Base):
+    __tablename__ = EVIDENCE_TABLE_NAME
+
+    id = Column(Integer, primary_key=True)
+    citation_id = Column(Integer, ForeignKey('{}.id'.format(CITATION_TABLE_NAME)))
+    supportingText = Column(Text)
+
+
+class Graphstore(Base):
     __tablename__ = GRAPH_TABLE_NAME
 
     id = Column(Integer, primary_key=True)
     description = Column(Text, nullable=True)
     label = Column(String(25), index=True, unique=True)
     graph = Column(Binary)
+
+    edges = relationship("AssociationEdgeGraph", back_populates="graph")

@@ -1,5 +1,4 @@
 import logging
-import os
 import time
 from datetime import datetime
 
@@ -8,19 +7,14 @@ from sqlalchemy import create_engine, exists
 from sqlalchemy.orm import sessionmaker, scoped_session
 
 from . import database_models
+from . import defaults
 from .database_models import DEFINITION_TABLE_NAME, NAME_TABLE_NAME, DEFINITION_ANNOTATION, DEFINITION_NAMESPACE
 from .defaults import default_namespaces, default_annotations
 from .. import utils
-from unittest.mock import inplace
 
 log = logging.getLogger('pybel')
 
-pybel_data = os.path.expanduser('~/.pybel/data')
-if not os.path.exists(pybel_data):
-    os.makedirs(pybel_data)
-
-DEFAULT_DEFINITION_CACHE_NAME = 'definitions.db'
-DEFAULT_CACHE_LOCATION = os.path.join(pybel_data, DEFAULT_DEFINITION_CACHE_NAME)
+DEFAULT_CACHE_LOCATION = defaults.DEFAULT_BEL_DATA_LOCATION
 
 
 class DefinitionCacheManager:
@@ -158,7 +152,7 @@ class DefinitionCacheManager:
                                                                   right_on='definition_id',
                                                                   how='inner')
         grouped_dataframe = definition_context_dataframe[['url', 'name', 'id_y']].groupby("url")
-        
+
         cache = {url: pd.Series(group.id_y.values, index=group.name).to_dict() for url, group in
                  grouped_dataframe}
 
@@ -240,7 +234,7 @@ class DefinitionCacheManager:
 
     def update_definition(self, definition_url, overwrite_old_definition=True):
         """Checks if a namespace or annotation that is given by url is already in cache and if so, if it is up to date.
-        
+
         :param definition_url: URL to a namespace or annotation definition file (.belns / .belanno)
         :type definition_url: str
         :param overwrite_old_definition: Indicates if old namespaces should be removed from namespace_cache if a new version is inersted.
