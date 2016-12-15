@@ -12,7 +12,7 @@ from pyparsing import ParseException
 from requests_file import FileAdapter
 
 from .exceptions import PyBelWarning, PyBelError
-from .manager.namespace_cache import DefinitionCacheManager
+from .manager.definitions_cache import DefinitionCacheManager
 from .parser.parse_bel import BelParser
 from .parser.parse_metadata import MetadataParser
 from .parser.utils import split_file_to_annotations_and_definitions, subdict_matches

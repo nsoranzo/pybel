@@ -14,14 +14,14 @@ Also see (1) from http://click.pocoo.org/5/setuptools/#setuptools-integration
 
 import logging
 import os
-import time
 import sys
+import time
 
 import click
 import py2neo
 
 from . import graph
-from .manager.namespace_cache import DefinitionCacheManager, DEFAULT_CACHE_LOCATION
+from .manager.definitions_cache import DefinitionCacheManager, DEFAULT_CACHE_LOCATION
 
 log = logging.getLogger('pybel')
 log.setLevel(logging.DEBUG)
