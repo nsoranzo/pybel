@@ -5,9 +5,8 @@ import unittest
 
 import networkx as nx
 import py2neo
-from click.testing import CliRunner
-
 import pybel
+from click.testing import CliRunner
 from pybel import cli
 from pybel.graph import PYBEL_CONTEXT_TAG
 from tests.constants import test_bel_1, test_bel_slushy

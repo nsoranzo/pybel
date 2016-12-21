@@ -276,19 +276,21 @@ class DefinitionCacheManager:
         :return: None (does not exist) or number of namesapces.
         :rtype: None or dict
         """
-        definition_old = self.sesh.query(database_models.Definition).filter_by(keyword=definition_key,
-                                                                               definitionType=definition_type).first()
-        if definition_old:
-            return {
-                'keyword': definition_old.keyword,
-                'version': definition_old.version,
-                'url': definition_old.url,
-                'createdDateTime': definition_old.createdDateTime,
-                'pubDate': definition_old.pubDate,
-                'copyright': definition_old.copyright,
-                'author': definition_old.author,
-                'contact': definition_old.contact
-            }
+        if definition_type in ('N', 'A'):
+            definition_old = self.sesh.query(database_models.Definition).filter_by(keyword=definition_key,
+                                                                                   definitionType=definition_type).first()
+            if definition_old:
+                return {
+                    'keyword': definition_old.keyword,
+                    'version': definition_old.version,
+                    'url': definition_old.url,
+                    'createdDateTime': definition_old.createdDateTime,
+                    'pubDate': definition_old.pubDate,
+                    'copyright': definition_old.copyright,
+                    'author': definition_old.author,
+                    'contact': definition_old.contact
+                }
+                # ToDo: Add Exception for wrong definition-Type!
 
     def remove_definition(self, definition_url, created_date_time):
         """Removes namespace or annotation from cache by url and createdDateTime.

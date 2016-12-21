@@ -69,14 +69,22 @@ class Modification(Base):
 
     id = Column(Integer, primary_key=True)
     modType = Column(String(255))
-    variantType = Column(String(2), nullable=True)
+    variantString = Column(String(255), nullable=True)
     pmodName_id = Column(ForeignKey('{}.id'.format(NAME_TABLE_NAME)), nullable=True)
+    p3Name_id = Column(ForeignKey('{}.id'.format(NAME_TABLE_NAME)), nullable=True)
+    p5Name_id = Column(ForeignKey('{}.id'.format(NAME_TABLE_NAME)), nullable=True)
+    p3Range = Column(String(255), nullable=True)
+    p5Range = Column(String(255), nullable=True)
     pmodName = Column(String(255), nullable=True)
     aminoA = Column(String(3), nullable=True)
     aminoB = Column(String(3), nullable=True)
     position = Column(Integer, nullable=True)
 
     nodes = relationship("AssociationNodeMod", back_populates="modification")
+
+    pmodNameID = relationship("Name", foreign_keys=[pmodName_id])
+    p3NameID = relationship("Name", foreign_keys=[p3Name_id])
+    p5NameID = relationship("Name", foreign_keys=[p5Name_id])
 
 
 class Node(Base):
@@ -85,7 +93,9 @@ class Node(Base):
     id = Column(Integer, primary_key=True)
     function = Column(String(255))
     nodeIdentifier_id = Column(Integer, ForeignKey('{}.id'.format(NAME_TABLE_NAME)), nullable=True)
-    nodeHash = Column(String(255), index=True)
+    nodeHashString = Column(String(255), index=True)
+    sha256 = Column(String(255), index=True)
+    nodeHashTuple = Column(Binary)
 
     modifications = relationship("AssociationNodeMod", back_populates="node")
 
@@ -120,6 +130,7 @@ class AssociationEdgeProperty(Base):
 
     edge = relationship("Edge", back_populates='attributes')
 
+
 class Edge(Base):
     __tablename__ = EDGE_TABLE_NAME
 
@@ -129,6 +140,8 @@ class Edge(Base):
     object_id = Column(Integer, ForeignKey('{}.id'.format(NODE_TABLE_NAME)))
     citation_id = Column(Integer, ForeignKey('{}.id'.format(CITATION_TABLE_NAME)), nullable=True)
     supportingText_id = Column(Integer, ForeignKey('{}.id'.format(EVIDENCE_TABLE_NAME)), nullable=True)
+
+    sha256 = Column(String(255), index=True)
 
     subject = relationship("Node", foreign_keys=[subject_id])
     object = relationship("Node", foreign_keys=[object_id])
@@ -175,6 +188,7 @@ class Evidence(Base):
     id = Column(Integer, primary_key=True)
     citation_id = Column(Integer, ForeignKey('{}.id'.format(CITATION_TABLE_NAME)))
     supportingText = Column(Text)
+    sha256 = Column(String(255), index=True)
 
 
 class Graphstore(Base):

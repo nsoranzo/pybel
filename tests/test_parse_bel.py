@@ -2,7 +2,6 @@ import logging
 
 from pybel.parser.parse_bel import canonicalize_modifier, canonicalize_node
 from pybel.parser.parse_exceptions import NestedRelationNotSupportedException, IllegalTranslocationException
-
 from tests.constants import TestTokenParserBase, test_citation_dict
 
 log = logging.getLogger(__name__)
@@ -1891,13 +1890,13 @@ class TestRelations(TestTokenParserBase):
     def test_nested_failure(self):
         """
         3.1 \
-        Test nested statement"""
+        Test nested edge"""
         statement = 'p(HGNC:CAT) -| (a(CHEBI:"hydrogen peroxide") -> bp(GO:"apoptotic process"))'
         with self.assertRaises(NestedRelationNotSupportedException):
             self.parser.relation.parseString(statement)
 
     def test_nested_lenient(self):
-        """ 3.1 \ Test nested statement"""
+        """ 3.1 \ Test nested edge"""
         statement = 'p(HGNC:CAT) -| (a(CHEBI:"hydrogen peroxide") -> bp(GO:"apoptotic process"))'
         self.parser.lenient = True
 

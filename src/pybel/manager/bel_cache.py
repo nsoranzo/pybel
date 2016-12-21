@@ -1,6 +1,6 @@
 import _pickle
+import hashlib
 import logging
-import os
 import time
 from copy import deepcopy
 
@@ -28,14 +28,17 @@ class BelDataManager:
         self.definitionCacheManager = definition_cache_manager if definition_cache_manager else DefinitionCacheManager(
             setup_default_cache=setup_default_cache)
 
-        self.citation_cache = {}
-        self.attribute_cache = {}
-        self.statement_cache = {}  # ToDo: check if this is same as edge_cache?
+        # self.citation_cache = {}
+        # self.attribute_cache = {}
+        # self.statement_cache = {}  # ToDo: check if this is same as edge_cache?
 
         self.cache = {'citation': {},
+                      'evidence': {},
                       'attribute': {},
                       'edge': {},
                       'node': {}}
+
+        self.setup_caches(node_cache=True, evidence_cache=True)
 
         # ToDo: Add these caches:
         # self.node_cache = {}
@@ -43,61 +46,38 @@ class BelDataManager:
 
         # self.setup_caches()
 
-    def setup_caches(self, citation_cache=True, attribute_cache=True, statement_cache=True):
+    def setup_caches(self, node_cache=False, edge_cache=False, citation_cache=False, evidence_cache=False,
+                     attribute_cache=False):
         # ToDo: Check if a flag is needed so these would not be setup at instantiation but with flag (timesaving?)
         """Initiates the caches of BelDataManager object so they will be available at initiation."""
 
-        if citation_cache and len(self.citation_cache) == 0:
+        if citation_cache and len(self.cache['citation']) == 0:
             citation_dataframe = pd.read_sql_table(database_models.CITATION_TABLE_NAME, self.eng).groupby(
                 'citationType')
-            self.citation_cache = {citType: pd.Series(group.id.values, index=group.reference).to_dict() for
+            self.cache['citation'] = {citType: pd.Series(group.id.values, index=group.reference).to_dict() for
                                    citType, group in citation_dataframe}
 
-        if attribute_cache and len(self.attribute_cache) == 0:
+        if attribute_cache and len(self.cache['attribute']) == 0:
             attributes_dataframe = pd.read_sql_table(database_models.PROPERTY_TABLE_NAME, self.eng).groupby('propKey')
-            self.attribute_cache = {propKey: pd.Series(group.id.values, index=group.propValue).to_dict() for
+            self.cache['attribute'] = {propKey: pd.Series(group.id.values, index=group.propValue).to_dict() for
                                     propKey, group in attributes_dataframe}
 
-        if statement_cache and len(self.statement_cache) == 0:
-            statement_attrib_dataframe = pd.read_sql_table(database_models.EDGE_PROPERTIES_TABLE_NAME,
-                                                           self.eng).groupby('edge_id')
-            self.statement_cache = {statement_id: set(group.property_id.values) for
-                                    statement_id, group in statement_attrib_dataframe}
+        if edge_cache and len(self.cache['edge']) == 0:
+            edge_dataframe = pd.read_sql_table(database_models.EDGE_TABLE_NAME, self.eng).groupby('sha256')
+            self.cache['edge'] = {sha256: group.id.values[0] for sha256, group in edge_dataframe}
+            # statement_attrib_dataframe = pd.read_sql_table(database_models.EDGE_PROPERTIES_TABLE_NAME,
+            #                                               self.eng).groupby('edge_id')
+            # self.cache['edge'] = {statement_id: set(group.property_id.values) for
+            #                        statement_id, group in statement_attrib_dataframe}
 
-    def setup_cache(self, cacheType):
-        """Creates cache of the given type.
-        Possible types of caches are:
-        - citation
-        - attribute
-        - edge
-        - node"""
-        cache_resolving = {
-            'citation': {
-                'database': database_models.CITATION_TABLE_NAME,
-                'grouping': 'citationType'
-            },
-            'attribute': {
-                'database': database_models.PROPERTY_TABLE_NAME,
-                'grouping': "propKey",
-            },
-            'edge': {
-                'database': database_models.EDGE_TABLE_NAME,
-                'grouping': "",
-            },
-            'node': {
-                'database': database_models.NODE_TABLE_NAME,
-                'grouping': ""
-            }
-        }
+        if evidence_cache and len(self.cache['evidence']) == 0:
+            evidence_dataframe = pd.read_sql_table(database_models.EVIDENCE_TABLE_NAME, self.eng).groupby('sha256')
+            self.cache['evidence'] = {sha256: group.id.values[0] for sha256, group in evidence_dataframe}
 
-        if cacheType in self.cache:
-            cache_dataframe = pd.read_sql_table(cache_resolving[cacheType]['database'], self.eng).groupby(
-                cache_resolving[cacheType]['grouping'])
-
-        else:
-            log.error(
-                "The cacheType '{}' does not exist. Use: (citation, attribute, edge or node) as cacheType.".format(
-                    cacheType))
+        if node_cache and len(self.cache['node']) == 0:
+            node_dataframe = pd.read_sql_table(database_models.NODE_TABLE_NAME, self.eng).groupby('nodeHashString')
+            self.cache['node'] = {_pickle.loads(group.nodeHashTuple.values[0]): group.id.values[0] for nodeHash, group
+                                  in node_dataframe}
 
     def store_graph(self, pybel_graph, graph_label, graph_description=None, extract_information=True):
         """Stores PyBEL Graph object into given database.
@@ -142,17 +122,22 @@ class BelDataManager:
                 "Graph with label '{}' does not exist. Use 'show_stored_graphs()' to get a list of all stored Graph-Labels.".format(
                     graph_label))
 
-    def __store_list(self, list_node):
-        node_id = None
-        return node_id
+    # def get_name_id(self,defType ,definition, name):
+    #    if defType == 'N':
+    #        return int(self.namespace_id_cache[self.namespace_dict[definition]['url']][name])
+    #    elif defType == 'A':
+    #        return int(self.annotation_id_cache[self.annotation_dict[definition]['url']][name])
 
     def store_node(self, nodeHash, node_data, namespace_dict, namespace_id_cache):
         """Stores Node into relational database.
         Uses get_or_create() to either make a new entry in db or return existing one."""
         node_type = node_data['type']
+        node_sha256 = hashlib.sha256(str(nodeHash).encode('utf-8')).hexdigest()
         node_dict = {
             'function': node_type,
-            'nodeHash': str(nodeHash),
+            'nodeHashString': str(nodeHash),
+            'nodeHashTuple': _pickle.dumps(nodeHash),
+            'sha256': node_sha256
         }
 
         if node_type not in ('Complex', 'Composite', 'Reaction'):
@@ -164,27 +149,67 @@ class BelDataManager:
             else:
                 print(nodeHash, "\t", node_data)
 
-        node = self.get_or_create(database_models.Node, node_dict)
+        node = self.get_or_create(database_models.Node, node_dict, discriminator_column='sha256')
 
         if node_type == 'ProteinVariant':
             for variant in node_data['variants']:
+                modificationType = variant[0]
                 modification_dict = {
-                    'modType': variant[0],
-                    'variantType': variant[1],
-                    'pmodName_id': None,
-                    'pmodName': None,
-                    'aminoA': variant[2],
-                    'aminoB': variant[4],
-                    'position': variant[3],
+                    'modType': modificationType,
                 }
-                modification = self.get_or_create(database_models.Modification, modification_dict)
+
+                if modificationType == 'Variant':
+                    modification_dict.update({
+                        'variantString': variant[1],
+                        # ToDo: These will be removed and the variant will not be splited anymore!
+                        # 'aminoA': variant[2],
+                        # 'aminoB': variant[4],
+                        # 'position': variant[3],
+                    })
+
+                elif modificationType == 'ProteinModification':
+                    if 'namespace' in node_data:
+                        modification_dict['pmodName_id'] = int(
+                            namespace_id_cache[namespace_dict[node_data['namespace']]['url']][
+                                node_data['name']])
+                    modification_dict.update({
+                        'pmodName': variant[1],
+                        'aminoA': variant[2] if len(variant) > 2 else None,
+                        'position': variant[3] if len(variant) > 3 else None
+                    })
+
+                else:
+                    print(nodeHash, "\t", node_data)
+                try:
+                    modification = self.get_or_create(database_models.Modification, modification_dict)
+                except:
+                    print(modification_dict)
+                    break
 
                 self.get_or_create(database_models.AssociationNodeMod, {
                     'node_id': node.id,
                     'modification_id': modification.id
                 })
 
-        # ToDo: Add Modification handling for pmod!
+        elif node_type == 'ProteinFusion':
+            # ToDo: Handle ProteinFusion!
+            modificationType = node_data['type']
+            modification_dict = {
+                'modType': modificationType,
+                'p3Range': node_data['range_3p'],
+                'p5Range': node_data['range_5p'],
+                # 'p3Name_id': self.get_name_id('N', node_data['partner_3p']),
+                # 'p5Name_id': self.get_name_id('N', node_data['partner_5p'])
+            }
+
+            modification = self.get_or_create(database_models.Modification, modification_dict)
+
+            self.get_or_create(database_models.AssociationNodeMod, {
+                'node_id': node.id,
+                'modification_id': modification.id
+            })
+
+        self.cache['node'][nodeHash] = int(node.id)
 
         return node
 
@@ -233,10 +258,17 @@ class BelDataManager:
                 #    namespace_dict[keyword][def_info['url']] = def_info
 
         for sub, obj, identifier, data in pybel_graph.edges_iter(data=True, keys=True):
-            subject_node = self.store_node(sub, pybel_graph.node[sub], namespace_dict, namespace_id_cache)
-            object_node = self.store_node(obj, pybel_graph.node[obj], namespace_dict, namespace_id_cache)
-            # ToDo: Evidence will be called supporting text in future!
-            supporting_text = None  # = data['Evidence'] if 'Evidence' in data else None
+
+            if sub not in self.cache['node']:
+                self.store_node(sub, pybel_graph.node[sub], namespace_dict, namespace_id_cache)
+
+            if obj not in self.cache['node']:
+                self.store_node(obj, pybel_graph.node[obj], namespace_dict, namespace_id_cache)
+
+            sub_id = self.cache['node'][sub]
+            obj_id = self.cache['node'][obj]
+
+            supporting_text_id = None  # = data['Evidence'] if 'Evidence' in data else None
             citation = None
 
             attribute_data = deepcopy(data)
@@ -253,30 +285,43 @@ class BelDataManager:
                 del (attribute_data['citation'])
 
                 if 'Evidence' in attribute_data:
-                    evidence_dict = {
-                        'supportingText': attribute_data['Evidence'],
-                        'citation_id': citation.id
-                    }
-                    supporting_text = self.get_or_create(database_models.Evidence, evidence_dict)
-                    del (attribute_data['Evidence'])
+                    evidence_text = attribute_data['Evidence']
+                    evidence_sha256 = hashlib.sha256(evidence_text.encode('utf-8')).hexdigest()
+                    if evidence_sha256 not in self.cache['evidence']:
+                        evidence_dict = {
+                            'supportingText': evidence_text,
+                            'citation_id': citation.id,
+                            'sha256': evidence_sha256
+                        }
+                        # ToDo: Ignore_existing is used to create entry even if the entry allready exists in the database
+                        supporting_text = self.get_or_create(database_models.Evidence, evidence_dict,
+                                                             discriminator_column='sha256')
+                        self.cache['evidence'][evidence_sha256] = int(supporting_text.id)
 
-            # modification = self.get_or_create(database_models.Modification, modification_dict)
+                    del (attribute_data['Evidence'])
+                    supporting_text_id = self.cache['evidence'][evidence_sha256]
 
             relation = attribute_data['relation']
             del (attribute_data['relation'])
 
-            edge_dict = {
-                'subject_id': int(subject_node.id),
-                'object_id': int(object_node.id),
-                'relation': relation,
-                'citation_id': int(citation.id) if citation else citation,
-                'supportingText_id': int(supporting_text.id) if supporting_text else supporting_text
-            }
+            edge_sha256 = hashlib.sha256(
+                str((sub_id, obj_id, relation, supporting_text_id)).encode('utf-8')).hexdigest()
 
-            edge = self.get_or_create(database_models.Edge, edge_dict)
+            if edge_sha256 not in self.cache['edge']:
+                edge_dict = {
+                    'subject_id': sub_id,
+                    'object_id': obj_id,
+                    'relation': relation,
+                    'citation_id': int(citation.id) if citation else None,
+                    'supportingText_id': supporting_text_id,
+                    'sha256': edge_sha256
+                }
+                edge = self.get_or_create(database_models.Edge, edge_dict, discriminator_column='sha256')
+                self.cache['edge'][edge_sha256] = edge.id
+
 
             self.get_or_create(database_models.AssociationEdgeGraph, {
-                'edge_id': int(edge.id),
+                'edge_id': self.cache['edge'][edge_sha256],
                 'graph_id': int(graph_id)
             })
 
@@ -317,34 +362,38 @@ class BelDataManager:
 
                     for attribute in attributes:
                         self.get_or_create(database_models.AssociationEdgeProperty, {
-                            'edge_id': int(edge.id),
+                            'edge_id': self.cache['edge'][edge_sha256],
                             'attribute_id': int(attribute.id)
                         })
 
                 elif attribute_key in annotation_dict:
                     annotationName_id = int(annotation_id_cache[annotation_dict[attribute_key]['url']][attribute_value])
                     edge_annotation_dict = {
-                        'edge_id': int(edge.id),
+                        'edge_id': self.cache['edge'][edge_sha256],
                         'annotationName_id': annotationName_id
                     }
                     self.get_or_create(database_models.AssociationEdgeAnnotation, edge_annotation_dict)
 
-            self.sesh.commit()
+        self.sesh.commit()
 
     def show_stored_graphs(self):
         """Shows stored graphs in relational database."""
         stored_graph_label = self.sesh.query(database_models.Graphstore.label).all()
         return [g_label for labels_listed in stored_graph_label for g_label in labels_listed]
 
-    def get_or_create(self, database_model, insert_dict):
+    def get_or_create(self, database_model, insert_dict, discriminator_column=None, ignore_existing=False):
         """Method to insert a new instance into the relational database or to return the instance if it allready
         exists in database.
         """
+        instance = None
+        discriminator_dict = {
+            discriminator_column: insert_dict[discriminator_column]} if discriminator_column else insert_dict
+        if not ignore_existing:
+            instance = self.sesh.query(database_model).filter_by(**discriminator_dict).first()
+            if instance:
+                return instance
 
-        instance = self.sesh.query(database_model).filter_by(**insert_dict).first()
-        if instance:
-            return instance
-        else:
+        if not instance:
             instance = database_model(**insert_dict)
             self.sesh.add(instance)
             self.sesh.flush()
