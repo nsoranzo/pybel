@@ -21,64 +21,58 @@ import click
 import py2neo
 
 from . import graph
-from .manager.definitions_cache import DefinitionCacheManager, DEFAULT_CACHE_LOCATION
+from .constants import PYBEL_DIR
+from .manager.cache import DEFAULT_CACHE_LOCATION, CacheManager
+from .manager.graph_cache import GraphCacheManager, to_database, from_database
 
 log = logging.getLogger('pybel')
-log.setLevel(logging.DEBUG)
 
-log_levels = {
-    0: logging.INFO,
-    1: logging.DEBUG,
-}
+formatter = logging.Formatter('%(name)s:%(levelname)s - %(message)s')
+logging.basicConfig(format=formatter)
 
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-ch = logging.StreamHandler()
-ch.setFormatter(formatter)
-
-pybel_directory = os.path.expanduser('~/.pybel')
-if not os.path.exists(pybel_directory):
-    os.mkdir(os.path.expanduser(pybel_directory))
-
-fh_path = os.path.join(pybel_directory, time.strftime('pybel_%Y_%m_%d_%H_%M_%S.txt'))
+fh_path = os.path.join(PYBEL_DIR, time.strftime('pybel_%Y_%m_%d_%H_%M_%S.txt'))
 fh = logging.FileHandler(fh_path)
 fh.setLevel(logging.DEBUG)
 fh.setFormatter(formatter)
 log.addHandler(fh)
 
 
-@click.group(help="PyBEL Command Line Utilities")
+@click.group(help="PyBEL Command Line Utilities on {}".format(sys.executable))
 @click.version_option()
 def main():
     pass
 
 
 @main.command()
-@click.option('--path', type=click.File('r'), help='Input BEL file file path. Use - for stdin')
+@click.option('--path', type=click.File('r'), default=sys.stdin, help='Input BEL file file path')
 @click.option('--url', help='Input BEL file URL')
-@click.option('--database', help='Input BEL database')
+@click.option('--database-name', help='Input graph name from database')
+@click.option('--database-connection', help='Input cache location. Defaults to {}'.format(DEFAULT_CACHE_LOCATION))
 @click.option('--csv', help='Output path for *.csv')
 @click.option('--graphml', help='Output path for GraphML output. Use *.graphml for Cytoscape')
 @click.option('--json', type=click.File('w'), help='Output path for Node-link *.json')
 @click.option('--pickle', help='Output path for NetworkX *.gpickle')
+@click.option('--bel', type=click.File('w'), help='Output canonical BEL')
 @click.option('--neo', help="Connection string for neo4j upload")
 @click.option('--neo-context', help="Context for neo4j upload")
+@click.option('--store-default', is_flag=True, help="Stores to default cache at {}".format(DEFAULT_CACHE_LOCATION))
+@click.option('--store', help="Database connection string")
 @click.option('--lenient', is_flag=True, help="Enable lenient parsing")
+@click.option('--complete-origin', is_flag=True, help="Complete origin from protein to gene")
 @click.option('--log-file', type=click.File('w'), help="Optional path for verbose log output")
 @click.option('-v', '--verbose', count=True)
-def convert(path, url, database, csv, graphml, json, pickle, neo, neo_context, lenient, log_file, verbose):
+def convert(path, url, database_name, database_connection, csv, graphml, json, pickle, bel, neo, neo_context,
+            store_default, store, lenient, complete_origin, log_file, verbose):
     """Options for multiple outputs/conversions"""
 
-    ch.setLevel(log_levels.get(verbose, 5))
-    log.addHandler(ch)
+    log.setLevel(int(5 * verbose ** 2 / 2 - 25 * verbose / 2 + 20))
 
-    if path:
-        g = graph.BELGraph(path, lenient=lenient, log_stream=log_file)
-    elif url:
-        g = graph.from_url(url, lenient=lenient, log_stream=log_file)
-    elif database:
-        g = graph.from_database(database)
+    if url:
+        g = graph.from_url(url, lenient=lenient, complete_origin=complete_origin, log_stream=log_file)
+    elif database_name:
+        g = from_database(database_name, connection=database_connection)
     else:
-        raise ValueError('missing BEL file')
+        g = graph.BELGraph(path, lenient=lenient, complete_origin=complete_origin, log_stream=log_file)
 
     if csv:
         log.info('Outputting csv to %s', csv)
@@ -96,13 +90,23 @@ def convert(path, url, database, csv, graphml, json, pickle, neo, neo_context, l
         log.info('Outputting pickle to %s', pickle)
         graph.to_pickle(g, pickle)
 
+    if bel:
+        log.info('Outputting BEL to %s', bel)
+        graph.to_bel(g, bel)
+
+    if store_default:
+        to_database(g)
+
+    if store:
+        to_database(g, store)
+
     if neo:
         log.info('Uploading to neo4j with context %s', neo_context)
         neo_graph = py2neo.Graph(neo)
         assert neo_graph.data('match (n) return count(n) as count')[0]['count'] is not None
         graph.to_neo4j(g, neo_graph, neo_context)
 
-    sys.exit(0 if g.last_parse_errors == 0 else 1)
+    sys.exit(0 if 0 == sum(g.last_parse_errors.values()) else 1)
 
 
 @main.group(help="PyBEL Data Manager Utilities")
@@ -111,16 +115,62 @@ def manage():
 
 
 @manage.command(help='Set up definition cache with default definitions')
-@click.option('--path', help='Destination for namespace namspace_cache. Defaults to ~/.pybel/data/namespace_cache.db')
-def setup(path):
-    DefinitionCacheManager(conn=path, setup_default_cache=True)
-    sys.exit(0)
+@click.option('--path', help='Cache location. Defaults to {}'.format(DEFAULT_CACHE_LOCATION))
+@click.option('--skip-namespaces', is_flag=True)
+@click.option('--skip-annotations', is_flag=True)
+@click.option('--skip-owl', is_flag=True)
+def setup(path, skip_namespaces, skip_annotations, skip_owl):
+    cm = CacheManager(connection=path)
+    if not skip_namespaces:
+        cm.load_default_namespaces()
+    if not skip_annotations:
+        cm.load_default_annotations()
+    if not skip_owl:
+        cm.load_default_owl()
 
 
-@manage.command(help='Remove definition cache')
+@manage.command(help='Remove default definition cache at {}'.format(DEFAULT_CACHE_LOCATION))
 def remove():
     os.remove(DEFAULT_CACHE_LOCATION)
-    sys.exit(0)
+
+
+@manage.command(help='Manually add definition by URL')
+@click.argument('url')
+@click.option('--path', help='Cache location. Defaults to {}'.format(DEFAULT_CACHE_LOCATION))
+def insert(url, path):
+    dcm = CacheManager(connection=path)
+
+    if url.endswith('.belns'):
+        dcm.ensure_namespace(url)
+    elif url.endswith('.belanno'):
+        dcm.ensure_annotation(url)
+    else:
+        dcm.ensure_owl(url)
+
+
+@manage.command(help='List URLs of cached resources, or contents of a specific resource')
+@click.option('--url', help='Resource to list')
+@click.option('--path', help='Cache location. Defaults to {}'.format(DEFAULT_CACHE_LOCATION))
+def ls(url, path):
+    dcm = CacheManager(connection=path)
+
+    if not url:
+        click.echo_via_pager('\n'.join(sorted(x for x in dcm.ls() if x)))
+    else:
+        if url.endswith('.belns'):
+            res = dcm.get_namespace(url)
+        elif url.endswith('.belanno'):
+            res = dcm.get_annotation(url)
+        else:
+            res = dcm.get_owl_terms(url)
+        click.echo_via_pager('\n'.join(res))
+
+
+@manage.command(help='Lists stored graph names and versions')
+@click.option('--path', help='Cache location. Defaults to {}'.format(DEFAULT_CACHE_LOCATION))
+def ls_graphs(path):
+    gcm = GraphCacheManager(connection=path)
+    click.echo_via_pager('\n'.join('{} - {}'.format(a, b) for a, b in gcm.ls()))
 
 
 if __name__ == '__main__':

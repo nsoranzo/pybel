@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import itertools as itt
 import logging
 from copy import deepcopy
 
@@ -11,8 +12,8 @@ from .baseparser import BaseParser, WCW, nest, one_of_tags, triple
 from .parse_abundance_modifier import VariantParser, PsubParser, GsubParser, FragmentParser, FusionParser, \
     LocationParser, TruncParser
 from .parse_control import ControlParser
-from .parse_exceptions import NestedRelationNotSupportedException, IllegalTranslocationException, \
-    MissingCitationException, IllegalFunctionSemantic
+from .parse_exceptions import NestedRelationWarning, MalformedTranslocationWarning, \
+    MissingCitationException, InvalidFunctionSemantic, MissingSupportWarning
 from .parse_identifier import IdentifierParser
 from .parse_pmod import PmodParser
 from .utils import handle_debug, list2tuple, cartesian_dictionary
@@ -24,7 +25,7 @@ TWO_WAY_RELATIONS = {'negativeCorrelation', 'positiveCorrelation', 'association'
 
 class BelParser(BaseParser):
     def __init__(self, graph=None, valid_namespaces=None, namespace_mapping=None, valid_annotations=None,
-                 lenient=False):
+                 lenient=False, complete_origin=False):
         """Build a parser backed by a given dictionary of namespaces
 
         :param graph: the graph to put the network in. Constructs new nx.MultiDiGrap if None
@@ -41,6 +42,7 @@ class BelParser(BaseParser):
 
         self.graph = graph if graph is not None else nx.MultiDiGraph()
         self.lenient = lenient
+        self.complete_origin = complete_origin
         self.control_parser = ControlParser(valid_annotations=valid_annotations)
         self.identifier_parser = IdentifierParser(valid_namespaces=valid_namespaces,
                                                   mapping=namespace_mapping,
@@ -77,7 +79,7 @@ class BelParser(BaseParser):
 
         #: 2.1.1 http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XcomplexA
         general_abundance_tags = one_of_tags(['a', 'abundance'], 'Abundance', 'function')
-        self.general_abundance = general_abundance_tags + nest(identifier)
+        self.general_abundance = general_abundance_tags + nest(identifier + opt_location)
 
         #: 2.1.4 http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XgeneA
         gene_tag = one_of_tags(['g', 'geneAbundance'], 'Gene', 'function')
@@ -265,7 +267,7 @@ class BelParser(BaseParser):
         self.translocation_illegal = nest(self.simple_abundance)
 
         def handle_translocation_illegal(s, l, t):
-            raise IllegalTranslocationException('Unqualified translocation {} {} {}'.format(s, l, t))
+            raise MalformedTranslocationWarning('Unqualified translocation {} {} {}'.format(s, l, t))
 
         self.translocation_illegal.setParseAction(handle_translocation_illegal)
 
@@ -439,7 +441,7 @@ class BelParser(BaseParser):
 
     def handle_nested_relation(self, s, l, tokens):
         if not self.lenient:
-            raise NestedRelationNotSupportedException('Nesting unsupported: {}'.format(s))
+            raise NestedRelationWarning('Nesting unsupported: {}'.format(s))
 
         self.handle_relation(s, l, dict(subject=tokens['subject'],
                                         relation=tokens['relation'],
@@ -454,20 +456,15 @@ class BelParser(BaseParser):
         if self.identifier_parser.namespace_dict is None or 'identifier' not in tokens:
             return tokens
 
-        function_code = language.rev_value_map[tokens['function']]
         namespace, name = tokens['identifier']['namespace'], tokens['identifier']['name']
 
-        if function_code not in self.identifier_parser.namespace_dict[namespace][name]:
-            valid_list = ','.join(self.identifier_parser.namespace_dict[namespace][name])
-            fmt = "Invalid function for identifier {}:{}. Valid are: [{}]"
-            raise IllegalFunctionSemantic(fmt.format(namespace, name, valid_list))
-        return tokens
+        valid_function_codes = set(itt.chain.from_iterable(
+            language.value_map[v] for v in self.identifier_parser.namespace_dict[namespace][name]))
 
-    def handle_has_members(self, s, l, tokens):
-        parent = self.ensure_node(s, l, tokens[0])
-        for child_tokens in tokens[2]:
-            child = self.ensure_node(s, l, child_tokens)
-            self.graph.add_edge(parent, child, relation='hasMember')
+        if tokens['function'] not in valid_function_codes:
+            valid_list = ','.join(self.identifier_parser.namespace_dict[namespace][name])
+            fmt = "Invalid function ({}) for identifier {}:{}. Valid are: [{}]"
+            raise InvalidFunctionSemantic(fmt.format(tokens['function'], namespace, name, valid_list))
         return tokens
 
     def handle_fusion_legacy(self, s, l, tokens):
@@ -482,16 +479,39 @@ class BelParser(BaseParser):
         self.ensure_node(s, l, tokens)
         return tokens
 
-    def handle_relation(self, s, l, tokens):
+    def check_required_annotations(self, s):
         if not self.control_parser.citation:
             raise MissingCitationException('unable to add relation {}'.format(s))
+
+        if 'SupportingText' not in self.control_parser.annotations:
+            raise MissingSupportWarning('unable to add relation {}'.format(s))
+
+    def build_attrs(self, attrs=None, list_attrs=None):
+        attrs = {} if attrs is None else attrs
+        list_attrs = {} if list_attrs is None else list_attrs
+        for annotation_name, annotation_entry in self.get_annotations().items():
+            if isinstance(annotation_entry, set):
+                list_attrs[annotation_name] = annotation_entry
+            else:
+                attrs[annotation_name] = annotation_entry
+        return attrs, list_attrs
+
+    def handle_has_members(self, s, l, tokens):
+        parent = self.ensure_node(s, l, tokens[0])
+        for child_tokens in tokens[2]:
+            child = self.ensure_node(s, l, child_tokens)
+            self.graph.add_edge(parent, child, relation='hasMember')
+        return tokens
+
+    def handle_relation(self, s, l, tokens):
+        self.check_required_annotations(s)
 
         sub = self.ensure_node(s, l, tokens['subject'])
         obj = self.ensure_node(s, l, tokens['object'])
 
-        attrs = {
-            'relation': tokens['relation'],
-        }
+        attrs, list_attrs = self.build_attrs()
+
+        attrs['relation'] = tokens['relation']
 
         sub_mod = canonicalize_modifier(tokens['subject'])
         if sub_mod:
@@ -501,19 +521,23 @@ class BelParser(BaseParser):
         if obj_mod:
             attrs['object'] = obj_mod
 
-        list_attrs = {}
-        for annotation_name, annotation_entry in self.get_annotations().items():
-            if isinstance(annotation_entry, set):
-                list_attrs[annotation_name] = annotation_entry
-            else:
-                attrs[annotation_name] = annotation_entry
-
         for single_annotation in cartesian_dictionary(list_attrs):
             self.graph.add_edge(sub, obj, attr_dict=attrs, **single_annotation)
             if tokens['relation'] in TWO_WAY_RELATIONS:
-                self.graph.add_edge(obj, sub, attr_dict=attrs, **single_annotation)
+                self.add_reverse_edge(sub, obj, attrs, **single_annotation)
 
         return tokens
+
+    def add_reverse_edge(self, sub, obj, attrs, **single_annotation):
+        attrs_subject, attrs_object = attrs.get('subject'), attrs.get('object')
+        if attrs_subject:
+            del attrs['subject']
+            attrs['object'] = attrs_subject
+        if attrs_object:
+            del attrs['object']
+            attrs['subject'] = attrs_object
+
+        self.graph.add_edge(obj, sub, attr_dict=attrs, **single_annotation)
 
     def add_unqualified_edge(self, u, v, relation):
         """Adds unique edge that has no annotations
@@ -522,8 +546,9 @@ class BelParser(BaseParser):
         :param v: target node
         :param relation: relationship label
         """
-        if not self.graph.has_edge(u, v, relation):
-            self.graph.add_edge(u, v, key=relation, relation=relation)
+        key = language.unqualified_edge_code[relation]
+        if not self.graph.has_edge(u, v, key):
+            self.graph.add_edge(u, v, key=key, relation=relation)
 
     def ensure_node(self, s, l, tokens):
         """Turns parsed tokens into canonical node name and makes sure its in the graph
@@ -565,13 +590,13 @@ class BelParser(BaseParser):
 
         elif 'function' in tokens and 'variants' in tokens:
             cls, ns, val = name[:3]
-            vars = tuple(name[3:])
+            variants = tuple(name[3:])
             if name not in self.graph:
                 self.graph.add_node(name,
                                     type=cls,
                                     namespace=ns,
                                     name=val,
-                                    variants=vars)
+                                    variants=variants)
 
             c = {
                 'function': tokens['function'],
@@ -611,6 +636,9 @@ class BelParser(BaseParser):
                                         namespace=tokens['identifier']['namespace'],
                                         name=tokens['identifier']['name'])
 
+                if not self.complete_origin:
+                    return name
+
                 gene_tokens = deepcopy(tokens)
                 gene_tokens['function'] = 'Gene'
                 gene_name = self.ensure_node(s, l, gene_tokens)
@@ -624,6 +652,9 @@ class BelParser(BaseParser):
                                         type=tokens['function'],
                                         namespace=tokens['identifier']['namespace'],
                                         name=tokens['identifier']['name'])
+
+                if not self.complete_origin:
+                    return name
 
                 rna_tokens = deepcopy(tokens)
                 rna_tokens['function'] = 'RNA'
@@ -717,22 +748,3 @@ def canonicalize_modifier(tokens):
         }
 
     return attrs
-
-
-def write_variant(tokens):
-    if isinstance(tokens, dict):
-        if {'identifier', 'code', 'pos'} <= set(tokens):
-            return 'pmod({}, {}, {})'.format(tokens['identifier'], tokens['code'], tokens['pos'])
-        elif {'identifier', 'code'} <= set(tokens):
-            return 'pmod({}, {})'.format(tokens['identifier'], tokens['code'])
-        elif 'identifier' in tokens:
-            return 'pmod({})'.format(tokens['identifier'])
-        else:
-            raise NotImplementedError('prob with {}'.format(tokens))
-
-    elif tokens[0] == 'Variant':
-        return 'var({})'.format(''.join(str(token) for token in tokens[1:]))
-    elif tokens[0] == 'ProteinModification':
-        return 'pmod({})'.format(tokens[1])
-    else:
-        raise NotImplementedError('prob with :{}'.format(tokens))

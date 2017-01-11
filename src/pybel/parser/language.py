@@ -8,20 +8,22 @@ import logging
 
 from pyparsing import *
 
-from .parse_exceptions import PlaceholderAminoAcidException
+from .parse_exceptions import PlaceholderAminoAcidWarning
 
 log = logging.getLogger('pybel')
 
 document_keys = {
-    'Authors',
-    'ContactInfo',
-    'Copyright',
-    'Description',
-    'Disclaimer',
-    'Licenses',
-    'Name',
-    'Version'
+    'Authors': 'authors',
+    'ContactInfo': 'contact',
+    'Copyright': 'copyright',
+    'Description': 'description',
+    'Disclaimer': 'disclaimer',
+    'Licenses': 'licenses',
+    'Name': 'name',
+    'Version': 'version'
 }
+
+inv_document_keys = {v: k for k, v in document_keys.items()}
 
 activity_labels = {
     'catalyticActivity': 'CatalyticActivity',
@@ -29,7 +31,7 @@ activity_labels = {
     'chaperoneActivity': 'ChaperoneActivity',
     'chap': 'ChaperoneActivity',
     'gtpBoundActivity': 'GTPBoundActivity',
-    'gtp': 'GTPBoungActivity',
+    'gtp': 'GTPBoundActivity',
     'kinaseActivity': 'KinaseActivity',
     'kin': 'KinaseActivity',
     'peptidaseActivity': 'PeptidaseActivity',
@@ -43,6 +45,19 @@ activity_labels = {
     'transportActivity': 'TransportActivity',
     'tport': 'TransportActivity',
     'molecularActivity': 'MolecularActivity'
+}
+
+rev_activity_labels = {
+    'CatalyticActivity': 'cat',
+    'ChaperoneActivity': 'chap',
+    'GTPBoundActivity': 'gtp',
+    'KinaseActivity': 'kin',
+    'PeptidaseActivity': 'pep',
+    'PhosphotaseActivity': 'phos',
+    'RibosylationActivity': 'ribo',
+    'TranscriptionalActivity': 'tscript',
+    'TransportActivity': 'tport',
+    'MolecularActivity': 'molecularActivity'
 }
 
 # TODO fill out
@@ -90,17 +105,17 @@ rev_abundance_labels = {
 
 #: See https://wiki.openbel.org/display/BELNA/Assignment+of+Encoding+%28Allowed+Functions%29+for+BEL+Namespaces
 value_map = {
-    'G': 'Gene',
-    'R': 'RNA',
-    'P': 'Protein',
-    'M': 'miRNA',
-    'A': 'Abundance',
-    'B': 'BiologicalProcess',
-    'O': 'Pathology',
-    'C': 'Complex'
+    'G': {'Gene'},
+    'R': {'miRNA', 'RNA'},
+    'P': {'Protein'},
+    'M': {'miRNA'},
+    'A': {'Abundance', 'RNA', 'miRNA', 'Protein', 'Gene', 'Complex'},
+    'B': {'Pathology', 'BiologicalProcess'},
+    'O': {'Pathology'},
+    'C': {'Complex'}
 }
 
-rev_value_map = {v: k for k, v in value_map.items()}
+# rev_value_map = {v: k for k, v in value_map.items()}
 
 amino_acid_dict = {
     'A': 'Ala',
@@ -133,7 +148,7 @@ aa_placeholder = Keyword('X')
 
 
 def handle_aa_placeholder(s, l, tokens):
-    raise PlaceholderAminoAcidException('Placeholder amino acid X found')
+    raise PlaceholderAminoAcidWarning('Placeholder amino acid X found')
 
 
 aa_placeholder.setParseAction(handle_aa_placeholder)
@@ -233,17 +248,17 @@ pmod_legacy_labels = {
     'H': 'Hy',
     'M': 'Me',
     'R': 'ADPRib',
-    'S': 'Sump',
+    'S': 'Sumo',
     'U': 'Ub',
 }
 
-relation_labels = {
-    'pmod': 'ProteinModification',
-    'proteinModification': 'ProteinModification'
-}
+unqualified_edges = [
+    'hasReactant',
+    'hasProduct',
+    'hasComponent',
+    'hasVariant',
+    'transcribedTo',
+    'translatedTo'
+]
 
-variant_parent_dict = {
-    'GeneVariant': 'Gene',
-    'RNAVariant': 'RNA',
-    'ProteinVariant': 'Protein'
-}
+unqualified_edge_code = {relation: (-1 - i) for i, relation in enumerate(unqualified_edges)}
