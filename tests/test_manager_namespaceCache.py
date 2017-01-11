@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pybel.manager.defaults import default_annotations as expected_an_keys
 from pybel.manager.defaults import default_namespaces as expected_ns_keys
-from pybel.manager.namespace_cache import DefinitionCacheManager
+from pybel.manager.definitions_cache import DefinitionCacheManager
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 

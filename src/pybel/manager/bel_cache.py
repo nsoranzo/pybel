@@ -5,7 +5,7 @@ import time
 from copy import deepcopy
 
 import pandas as pd
-from sqlalchemy import create_engine, exists
+from sqlalchemy import exists
 from sqlalchemy.orm import sessionmaker, scoped_session
 
 from . import database_models
@@ -23,10 +23,12 @@ class BelDataManager:
     def __init__(self, conn=None, definition_cache_manager=None, setup_default_cache=True, log_sql=False):
         conn = conn if conn is not None else 'sqlite:///' + defaults.DEFAULT_BEL_DATA_LOCATION
 
-        self.eng = create_engine(conn, echo=log_sql)
-        self.sesh = scoped_session(sessionmaker(bind=self.eng, autoflush=False, expire_on_commit=False))
         self.definitionCacheManager = definition_cache_manager if definition_cache_manager else DefinitionCacheManager(
+            conn=conn,
             setup_default_cache=setup_default_cache)
+
+        self.eng = self.definitionCacheManager.eng  # create_engine(conn, echo=log_sql)
+        self.sesh = scoped_session(sessionmaker(bind=self.eng, autoflush=False, expire_on_commit=False))
 
         # self.citation_cache = {}
         # self.attribute_cache = {}
@@ -38,7 +40,7 @@ class BelDataManager:
                       'edge': {},
                       'node': {}}
 
-        self.setup_caches(node_cache=True, evidence_cache=True)
+        #self.setup_caches(node_cache=True, evidence_cache=True)
 
         # ToDo: Add these caches:
         # self.node_cache = {}
@@ -96,6 +98,7 @@ class BelDataManager:
         """
         if self.sesh.query(exists().where(database_models.Graphstore.label == graph_label)).scalar():
             logging.error("A graph with the label '{}' allready exists in the graph-store!".format(graph_label))
+            return False
         else:
             pyGraph_data = {
                 'description': graph_description,
@@ -104,7 +107,9 @@ class BelDataManager:
             }
             g = self.eng.execute(database_models.Graphstore.__table__.insert(), pyGraph_data)
             g_id = g.inserted_primary_key[0]
-            self.extract_information(pybel_graph, g_id)
+            if extract_information:
+                self.extract_information(pybel_graph, g_id)
+            return True
 
     def load_graph(self, graph_label):
         """Loads stored graph from relational database.
