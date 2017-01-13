@@ -1,0 +1,275 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Cookbook &mdash; PyBEL 0.3.2 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="PyBEL 0.3.2 documentation" href="index.html"/>
+        <link rel="next" title="Reference" href="reference.html"/>
+        <link rel="prev" title="Data Model" href="datamodel.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> PyBEL
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.3.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="datamodel.html">Data Model</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Cookbook</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#command-line-usage">Command Line Usage</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#example-workflow">Example Workflow</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#python-api">Python API</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#draw-networkx-and-matplotlib">Draw NetworkX and MatplotLib</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#export-to-neo4j">Export to Neo4j</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="io.html">Input and Output</a></li>
+<li class="toctree-l1"><a class="reference internal" href="logging.html">Logging Messages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="roadmap.html">Roadmap</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="index.html">PyBEL</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html">Docs</a> &raquo;</li>
+      
+    <li>Cookbook</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/cookbook.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="cookbook">
+<h1>Cookbook<a class="headerlink" href="#cookbook" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="command-line-usage">
+<h2>Command Line Usage<a class="headerlink" href="#command-line-usage" title="Permalink to this headline">¶</a></h2>
+<p>PyBEL automatically installs the command <code class="code docutils literal"><span class="pre">pybel</span></code>. This command can be used to easily compile BEL documents
+and convert to other formats. See <code class="code docutils literal"><span class="pre">pybel</span> <span class="pre">--help</span></code> for usage details. This command makes logs of all conversions
+and warnings to the directory <code class="code docutils literal"><span class="pre">~/.pybel/</span></code>.</p>
+<p>Load, compile, and export to Cytoscape format:</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span>$ pybel convert --path ~/Desktop/example.bel --graphml ~/Desktop/example.graphml
+</pre></div>
+</div>
+<p>In Cytoscape, open with <code class="code docutils literal"><span class="pre">Import</span> <span class="pre">&gt;</span> <span class="pre">Network</span> <span class="pre">&gt;</span> <span class="pre">From</span> <span class="pre">File</span></code>.</p>
+<div class="section" id="example-workflow">
+<h3>Example Workflow<a class="headerlink" href="#example-workflow" title="Permalink to this headline">¶</a></h3>
+<p>In this example, a local file is parsed and output to both GraphML and a Python pickle object for later. The logging
+is output as well, for error triaging with grep. This example makes use of the logging message codes, which are
+mentioned later in the documentation.</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span><span class="ch">#!/usr/bin/env bash</span>
+pybel convert --path ~/ownCloud/BEL/PD_Aetionomy.bel <span class="se">\</span>
+        --graphml ~/bel/PD.graphml --pickle ~/bel/PD.gpickle <span class="se">\</span>
+        --log-file ~/bel/PD_log.txt
+
+cat ~/bel/PD_log.txt <span class="p">|</span> grep <span class="s2">&quot;ERROR&quot;</span> &gt; ~/bel/PD_errors.txt
+cat ~/bel/PD_log.txt <span class="p">|</span> grep <span class="s2">&quot;PyBEL1&quot;</span> &gt; ~/bel/PD_caught.txt
+cat ~/bel/PD_log.txt <span class="p">|</span> grep <span class="s2">&quot;PyBEL121&quot;</span> <span class="p">|</span> cut -d <span class="s2">&quot;-&quot;</span> -f 6,8 <span class="p">|</span> tr <span class="s1">&#39;-&#39;</span> <span class="s1">&#39;\t&#39;</span> &gt; ~/bel/PD_missing_ns.tsv
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="python-api">
+<h2>Python API<a class="headerlink" href="#python-api" title="Permalink to this headline">¶</a></h2>
+<p>PyBEL has a programmatic API for analysis using the swath of tools provided by PyBEL, NetworkX, and the community of
+python programmers in Network Science. The most useful functions for users are exposed at the top level package.
+These functions allow for easy import from URL, file, iterable, or a database. It also includes various export options.</p>
+<div class="section" id="draw-networkx-and-matplotlib">
+<h3>Draw NetworkX and MatplotLib<a class="headerlink" href="#draw-networkx-and-matplotlib" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">pybel</span><span class="o">,</span> <span class="nn">networkx</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">url</span> <span class="o">=</span> <span class="s1">&#39;http://resource.belframework.org/belframework/1.0/knowledge/small_corpus.bel&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">g</span> <span class="o">=</span> <span class="n">pybel</span><span class="o">.</span><span class="n">from_url</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>  <span class="c1"># takes about 20 seconds</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">networkx</span><span class="o">.</span><span class="n">draw</span><span class="p">(</span><span class="n">g</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="export-to-neo4j">
+<h3>Export to Neo4j<a class="headerlink" href="#export-to-neo4j" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">pybel</span><span class="o">,</span> <span class="nn">py2neo</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">url</span> <span class="o">=</span> <span class="s1">&#39;http://resource.belframework.org/belframework/1.0/knowledge/small_corpus.bel&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">g</span> <span class="o">=</span> <span class="n">pybel</span><span class="o">.</span><span class="n">from_url</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">neo_graph</span> <span class="o">=</span> <span class="n">py2neo</span><span class="o">.</span><span class="n">Graph</span><span class="p">(</span><span class="s2">&quot;http://localhost:7474/db/data/&quot;</span><span class="p">)</span>  <span class="c1"># use your own connection settings</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pybel</span><span class="o">.</span><span class="n">to_neo4j</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">neo_graph</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="reference.html" class="btn btn-neutral float-right" title="Reference" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="datamodel.html" class="btn btn-neutral" title="Data Model" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Charles Tapley Hoyt.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.3.2',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

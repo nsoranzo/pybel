@@ -1,0 +1,483 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>pybel.canonicalize &mdash; PyBEL 0.3.2 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../../genindex.html"/>
+        <link rel="search" title="Search" href="../../search.html"/>
+    <link rel="top" title="PyBEL 0.3.2 documentation" href="../../index.html"/>
+        <link rel="up" title="Module code" href="../index.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> PyBEL
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.3.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../datamodel.html">Data Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../cookbook.html">Cookbook</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../reference.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../io.html">Input and Output</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../logging.html">Logging Messages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../roadmap.html">Roadmap</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">PyBEL</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      
+    <li>pybel.canonicalize</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for pybel.canonicalize</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">print_function</span>
+
+<span class="kn">import</span> <span class="nn">itertools</span> <span class="k">as</span> <span class="nn">itt</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">operator</span> <span class="k">import</span> <span class="n">itemgetter</span>
+
+<span class="kn">from</span> <span class="nn">.parser</span> <span class="k">import</span> <span class="n">language</span>
+<span class="kn">from</span> <span class="nn">.parser.language</span> <span class="k">import</span> <span class="n">rev_activity_labels</span><span class="p">,</span> <span class="n">inv_document_keys</span>
+<span class="kn">from</span> <span class="nn">.parser.utils</span> <span class="k">import</span> <span class="n">ensure_quotes</span>
+<span class="kn">from</span> <span class="nn">.constants</span> <span class="k">import</span> <span class="n">GOCC_LATEST</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;to_bel&#39;</span><span class="p">]</span>
+
+<span class="c1"># TODO extract from .parse_control</span>
+<span class="n">CITATION_ENTRIES</span> <span class="o">=</span> <span class="s1">&#39;type&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;reference&#39;</span><span class="p">,</span> <span class="s1">&#39;date&#39;</span><span class="p">,</span> <span class="s1">&#39;authors&#39;</span><span class="p">,</span> <span class="s1">&#39;comments&#39;</span>
+
+<span class="n">BLACKLIST_EDGE_ATTRIBUTES</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;relation&#39;</span><span class="p">,</span> <span class="s1">&#39;subject&#39;</span><span class="p">,</span> <span class="s1">&#39;object&#39;</span><span class="p">,</span> <span class="s1">&#39;citation&#39;</span><span class="p">,</span> <span class="s1">&#39;SupportingText&#39;</span><span class="p">}</span>
+
+<span class="n">variant_parent_dict</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;GeneVariant&#39;</span><span class="p">:</span> <span class="s1">&#39;g&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;RNAVariant&#39;</span><span class="p">:</span> <span class="s1">&#39;r&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;ProteinVariant&#39;</span><span class="p">:</span> <span class="s1">&#39;p&#39;</span>
+<span class="p">}</span>
+
+<span class="n">fusion_parent_dict</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;GeneFusion&#39;</span><span class="p">:</span> <span class="s1">&#39;g&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;RNAFusion&#39;</span><span class="p">:</span> <span class="s1">&#39;r&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;ProteinFusion&#39;</span><span class="p">:</span> <span class="s1">&#39;p&#39;</span>
+<span class="p">}</span>
+
+
+<span class="k">def</span> <span class="nf">get_neighbors_by_path_type</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">relation</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Gets the set of neighbors of a given node that have a relation of the given type</span>
+
+<span class="sd">    :param g: A BEL network</span>
+<span class="sd">    :type g: :class:`pybel.BELGraph`</span>
+<span class="sd">    :param v: a node from the BEL network</span>
+<span class="sd">    :param relation: the relation to follow from the given node</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">neighbor</span> <span class="ow">in</span> <span class="n">g</span><span class="o">.</span><span class="n">edge</span><span class="p">[</span><span class="n">v</span><span class="p">]:</span>
+        <span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="n">g</span><span class="o">.</span><span class="n">edge</span><span class="p">[</span><span class="n">v</span><span class="p">][</span><span class="n">neighbor</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;relation&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">relation</span><span class="p">:</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">neighbor</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">set</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">postpend_location</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">location_model</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Rips off the closing parentheses and adds canonicalized modification.</span>
+
+<span class="sd">    I did this because writing a whole new parsing model for the data would be sad and difficult</span>
+
+<span class="sd">    :param s:</span>
+<span class="sd">    :type s: BEL string representing node</span>
+<span class="sd">    :param location_model:</span>
+<span class="sd">    :return:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="n">k</span> <span class="ow">in</span> <span class="n">location_model</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">{</span><span class="s1">&#39;namespace&#39;</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">}):</span>
+        <span class="k">return</span> <span class="s2">&quot;loc(</span><span class="si">{}</span><span class="s2">:</span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">location_model</span><span class="p">[</span><span class="s1">&#39;namespace&#39;</span><span class="p">],</span> <span class="n">ensure_quotes</span><span class="p">(</span><span class="n">location_model</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]))</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Location model missing namespace and/or name keys: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">location_model</span><span class="p">))</span>
+
+
+<span class="k">def</span> <span class="nf">decanonicalize_variant</span><span class="p">(</span><span class="n">tokens</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">tokens</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;ProteinModification&#39;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tokens</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">return</span> <span class="s1">&#39;pmod(</span><span class="si">{}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">tokens</span><span class="p">[</span><span class="mi">1</span><span class="p">:])))</span>
+        <span class="k">return</span> <span class="s1">&#39;pmod(</span><span class="si">{}</span><span class="s1">:</span><span class="si">{}{}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">tokens</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">tokens</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;, </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">tokens</span><span class="p">[</span><span class="mi">2</span><span class="p">:]))</span>
+    <span class="k">elif</span> <span class="n">tokens</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;Variant&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s1">&#39;var(</span><span class="si">{}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">tokens</span><span class="p">[</span><span class="mi">1</span><span class="p">:])))</span>
+    <span class="k">elif</span> <span class="n">tokens</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;Fragment&#39;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s1">&#39;?&#39;</span> <span class="o">==</span> <span class="n">tokens</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">tokens</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s1">&#39;frag(?)&#39;</span>
+        <span class="k">elif</span> <span class="s1">&#39;?&#39;</span> <span class="o">==</span> <span class="n">tokens</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">tokens</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>  <span class="c1"># has description</span>
+            <span class="k">return</span> <span class="s1">&#39;frag(?, </span><span class="si">{}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">tokens</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">tokens</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s1">&#39;frag(</span><span class="si">{}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">tokens</span><span class="p">[</span><span class="mi">1</span><span class="p">:])))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s1">&#39;frag(</span><span class="si">{}</span><span class="s1">, </span><span class="si">{}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">tokens</span><span class="p">[</span><span class="mi">1</span><span class="p">:])),</span> <span class="n">tokens</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">elif</span> <span class="n">tokens</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;GeneModification&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s1">&#39;gmod(</span><span class="si">{}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">tokens</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Invalid variant: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">tokens</span><span class="p">))</span>
+
+
+<span class="k">def</span> <span class="nf">decanonicalize_fusion_range</span><span class="p">(</span><span class="n">tokens</span><span class="p">):</span>
+    <span class="k">if</span> <span class="s1">&#39;?&#39;</span> <span class="o">==</span> <span class="n">tokens</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="s1">&#39;?&#39;</span>
+    <span class="k">return</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.</span><span class="si">{}</span><span class="s1">_</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">tokens</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">tokens</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">tokens</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+
+
+<span class="k">def</span> <span class="nf">decanonicalize_node</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">v</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Returns a node from a graph as a BEL string</span>
+
+<span class="sd">    :param g: a BEL network</span>
+<span class="sd">    :type g: :class:`pybel.BELGraph`</span>
+<span class="sd">    :param v: a node from the BEL graph</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">tokens</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">node</span><span class="p">[</span><span class="n">v</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;Reaction&#39;</span><span class="p">:</span>
+        <span class="n">reactants</span> <span class="o">=</span> <span class="n">get_neighbors_by_path_type</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="s1">&#39;hasReactant&#39;</span><span class="p">)</span>
+        <span class="n">reactants_canon</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">n</span><span class="p">:</span> <span class="n">decanonicalize_node</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">reactants</span><span class="p">))</span>
+        <span class="n">products</span> <span class="o">=</span> <span class="n">get_neighbors_by_path_type</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="s1">&#39;hasProduct&#39;</span><span class="p">)</span>
+        <span class="n">products_canon</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">n</span><span class="p">:</span> <span class="n">decanonicalize_node</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">products</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s1">&#39;rxn(reactants(</span><span class="si">{}</span><span class="s1">), products(</span><span class="si">{}</span><span class="s1">))&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">reactants_canon</span><span class="p">),</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">products_canon</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;Composite&#39;</span><span class="p">,</span> <span class="s1">&#39;Complex&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="s1">&#39;namespace&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">tokens</span><span class="p">:</span>
+        <span class="n">members_canon</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">n</span><span class="p">:</span> <span class="n">decanonicalize_node</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+        <span class="k">return</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">(</span><span class="si">{}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">language</span><span class="o">.</span><span class="n">rev_abundance_labels</span><span class="p">[</span><span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]],</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">members_canon</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="s1">&#39;type&#39;</span> <span class="ow">in</span> <span class="n">tokens</span> <span class="ow">and</span> <span class="s1">&#39;variants&#39;</span> <span class="ow">in</span> <span class="n">tokens</span><span class="p">:</span>
+        <span class="n">variants</span> <span class="o">=</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">decanonicalize_variant</span><span class="p">,</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;variants&#39;</span><span class="p">])))</span>
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">(</span><span class="si">{}</span><span class="s2">:</span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">variant_parent_dict</span><span class="p">[</span><span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]],</span>
+                                      <span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;namespace&#39;</span><span class="p">],</span>
+                                      <span class="n">ensure_quotes</span><span class="p">(</span><span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]),</span>
+                                      <span class="n">variants</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;Gene&#39;</span><span class="p">,</span> <span class="s1">&#39;RNA&#39;</span><span class="p">,</span> <span class="s1">&#39;miRNA&#39;</span><span class="p">,</span> <span class="s1">&#39;Protein&#39;</span><span class="p">,</span> <span class="s1">&#39;Abundance&#39;</span><span class="p">,</span> <span class="s1">&#39;Complex&#39;</span><span class="p">,</span> <span class="s1">&#39;Pathology&#39;</span><span class="p">,</span> <span class="s1">&#39;BiologicalProcess&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">(</span><span class="si">{}</span><span class="s2">:</span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">language</span><span class="o">.</span><span class="n">rev_abundance_labels</span><span class="p">[</span><span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]],</span> <span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;namespace&#39;</span><span class="p">],</span>
+                                  <span class="n">ensure_quotes</span><span class="p">(</span><span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]))</span>
+
+    <span class="k">if</span> <span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;Fusion&#39;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">(fus(</span><span class="si">{}</span><span class="s2">:</span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2">:</span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2">))&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">fusion_parent_dict</span><span class="p">[</span><span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]],</span>
+            <span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;partner_5p&#39;</span><span class="p">][</span><span class="s1">&#39;namespace&#39;</span><span class="p">],</span>
+            <span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;partner_5p&#39;</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">],</span>
+            <span class="n">decanonicalize_fusion_range</span><span class="p">(</span><span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;range_5p&#39;</span><span class="p">]),</span>
+            <span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;partner_3p&#39;</span><span class="p">][</span><span class="s1">&#39;namespace&#39;</span><span class="p">],</span>
+            <span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;partner_3p&#39;</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">],</span>
+            <span class="n">decanonicalize_fusion_range</span><span class="p">(</span><span class="n">tokens</span><span class="p">[</span><span class="s1">&#39;range_3p&#39;</span><span class="p">])</span>
+        <span class="p">)</span>
+
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Unknown node data: </span><span class="si">{}</span><span class="s1"> </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">tokens</span><span class="p">))</span>
+
+
+<span class="k">def</span> <span class="nf">decanonicalize_edge_node</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="n">edge_data</span><span class="p">,</span> <span class="n">node_position</span><span class="p">):</span>
+    <span class="n">node_str</span> <span class="o">=</span> <span class="n">decanonicalize_node</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">node</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">node_position</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">edge_data</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">node_str</span>
+
+    <span class="n">node_edge_data</span> <span class="o">=</span> <span class="n">edge_data</span><span class="p">[</span><span class="n">node_position</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="s1">&#39;location&#39;</span> <span class="ow">in</span> <span class="n">node_edge_data</span><span class="p">:</span>
+        <span class="n">node_str</span> <span class="o">=</span> <span class="n">postpend_location</span><span class="p">(</span><span class="n">node_str</span><span class="p">,</span> <span class="n">node_edge_data</span><span class="p">[</span><span class="s1">&#39;location&#39;</span><span class="p">])</span>
+
+    <span class="k">if</span> <span class="s1">&#39;modifier&#39;</span> <span class="ow">in</span> <span class="n">node_edge_data</span> <span class="ow">and</span> <span class="s1">&#39;Degradation&#39;</span> <span class="o">==</span> <span class="n">node_edge_data</span><span class="p">[</span><span class="s1">&#39;modifier&#39;</span><span class="p">]:</span>
+        <span class="n">node_str</span> <span class="o">=</span> <span class="s2">&quot;deg(</span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">node_str</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="s1">&#39;modifier&#39;</span> <span class="ow">in</span> <span class="n">node_edge_data</span> <span class="ow">and</span> <span class="s1">&#39;Activity&#39;</span> <span class="o">==</span> <span class="n">node_edge_data</span><span class="p">[</span><span class="s1">&#39;modifier&#39;</span><span class="p">]:</span>
+        <span class="n">node_str</span> <span class="o">=</span> <span class="s2">&quot;act(</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">node_str</span><span class="p">)</span>
+        <span class="c1"># switch missing, default, and dict</span>
+        <span class="k">if</span> <span class="s1">&#39;effect&#39;</span> <span class="ow">in</span> <span class="n">node_edge_data</span> <span class="ow">and</span> <span class="s1">&#39;MolecularActivity&#39;</span> <span class="ow">in</span> <span class="n">node_edge_data</span><span class="p">[</span><span class="s1">&#39;effect&#39;</span><span class="p">]:</span>
+            <span class="n">ma</span> <span class="o">=</span> <span class="n">node_edge_data</span><span class="p">[</span><span class="s1">&#39;effect&#39;</span><span class="p">][</span><span class="s1">&#39;MolecularActivity&#39;</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ma</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">node_str</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">, ma(</span><span class="si">{}</span><span class="s2">))&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">node_str</span><span class="p">,</span> <span class="n">rev_activity_labels</span><span class="p">[</span><span class="n">ma</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ma</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                <span class="n">node_str</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">, ma(</span><span class="si">{}</span><span class="s2">:</span><span class="si">{}</span><span class="s2">))&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">node_str</span><span class="p">,</span> <span class="n">ma</span><span class="p">[</span><span class="s1">&#39;namespace&#39;</span><span class="p">],</span> <span class="n">ensure_quotes</span><span class="p">(</span><span class="n">ma</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">node_str</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">node_str</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="s1">&#39;modifier&#39;</span> <span class="ow">in</span> <span class="n">node_edge_data</span> <span class="ow">and</span> <span class="s1">&#39;Translocation&#39;</span> <span class="o">==</span> <span class="n">node_edge_data</span><span class="p">[</span><span class="s1">&#39;modifier&#39;</span><span class="p">]:</span>
+        <span class="n">fromLoc</span> <span class="o">=</span> <span class="s2">&quot;fromLoc(&quot;</span>
+        <span class="n">toLoc</span> <span class="o">=</span> <span class="s2">&quot;toLoc(&quot;</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node_edge_data</span><span class="p">[</span><span class="s1">&#39;effect&#39;</span><span class="p">][</span><span class="s1">&#39;fromLoc&#39;</span><span class="p">],</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">()</span>
+
+        <span class="n">fromLoc</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">:</span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">node_edge_data</span><span class="p">[</span><span class="s1">&#39;effect&#39;</span><span class="p">][</span><span class="s1">&#39;fromLoc&#39;</span><span class="p">][</span><span class="s1">&#39;namespace&#39;</span><span class="p">],</span>
+                                   <span class="n">ensure_quotes</span><span class="p">(</span><span class="n">node_edge_data</span><span class="p">[</span><span class="s1">&#39;effect&#39;</span><span class="p">][</span><span class="s1">&#39;fromLoc&#39;</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">]))</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node_edge_data</span><span class="p">[</span><span class="s1">&#39;effect&#39;</span><span class="p">][</span><span class="s1">&#39;toLoc&#39;</span><span class="p">],</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">()</span>
+
+        <span class="n">toLoc</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">:</span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">node_edge_data</span><span class="p">[</span><span class="s1">&#39;effect&#39;</span><span class="p">][</span><span class="s1">&#39;toLoc&#39;</span><span class="p">][</span><span class="s1">&#39;namespace&#39;</span><span class="p">],</span>
+                                 <span class="n">ensure_quotes</span><span class="p">(</span><span class="n">node_edge_data</span><span class="p">[</span><span class="s1">&#39;effect&#39;</span><span class="p">][</span><span class="s1">&#39;toLoc&#39;</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">]))</span>
+
+        <span class="n">node_str</span> <span class="o">=</span> <span class="s2">&quot;tloc(</span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2">, </span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">node_str</span><span class="p">,</span> <span class="n">fromLoc</span><span class="p">,</span> <span class="n">toLoc</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">node_str</span>
+
+
+<span class="k">def</span> <span class="nf">decanonicalize_edge</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">k</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Takes two nodes and gives back a BEL string representing the statement</span>
+
+<span class="sd">    :param g: A BEL graph</span>
+<span class="sd">    :type g: :class:`BELGraph`</span>
+<span class="sd">    :param u: The edge&#39;s source node</span>
+<span class="sd">    :param v: The edge&#39;s target node</span>
+<span class="sd">    :param k: The edge&#39;s key</span>
+<span class="sd">    :return: The canonical BEL for this edge</span>
+<span class="sd">    :rtype: str</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">ed</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">edge</span><span class="p">[</span><span class="n">u</span><span class="p">][</span><span class="n">v</span><span class="p">][</span><span class="n">k</span><span class="p">]</span>
+
+    <span class="n">u_str</span> <span class="o">=</span> <span class="n">decanonicalize_edge_node</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">ed</span><span class="p">,</span> <span class="n">node_position</span><span class="o">=</span><span class="s1">&#39;subject&#39;</span><span class="p">)</span>
+    <span class="n">v_str</span> <span class="o">=</span> <span class="n">decanonicalize_edge_node</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">ed</span><span class="p">,</span> <span class="n">node_position</span><span class="o">=</span><span class="s1">&#39;object&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> </span><span class="si">{}</span><span class="s2"> </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">u_str</span><span class="p">,</span> <span class="n">ed</span><span class="p">[</span><span class="s1">&#39;relation&#39;</span><span class="p">],</span> <span class="n">v_str</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">flatten_citation</span><span class="p">(</span><span class="n">citation</span><span class="p">):</span>
+    <span class="k">return</span> <span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;&quot;</span><span class="si">{}</span><span class="s1">&quot;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">citation</span><span class="p">[</span><span class="n">x</span><span class="p">])</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">CITATION_ENTRIES</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="n">citation</span><span class="p">)])</span>
+
+
+<span class="k">def</span> <span class="nf">sort_edges</span><span class="p">(</span><span class="n">d</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">flatten_citation</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="s1">&#39;citation&#39;</span><span class="p">]),</span> <span class="n">d</span><span class="p">[</span><span class="s1">&#39;SupportingText&#39;</span><span class="p">])</span> <span class="o">+</span> <span class="nb">tuple</span><span class="p">(</span>
+        <span class="n">itt</span><span class="o">.</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">BLACKLIST_EDGE_ATTRIBUTES</span><span class="p">))</span>
+
+
+<div class="viewcode-block" id="to_bel"><a class="viewcode-back" href="../../io.html#pybel.to_bel">[docs]</a><span class="k">def</span> <span class="nf">to_bel</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Outputs the BEL graph as a canonical BEL Script (.bel)</span>
+
+<span class="sd">    :param graph: the BEL Graph to output as a BEL Script</span>
+<span class="sd">    :type graph: BELGraph</span>
+<span class="sd">    :param file: a filelike object</span>
+<span class="sd">    :type file: file</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">graph</span><span class="o">.</span><span class="n">document</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;SET DOCUMENT </span><span class="si">{}</span><span class="s1"> = &quot;</span><span class="si">{}</span><span class="s1">&quot;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">inv_document_keys</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">graph</span><span class="o">.</span><span class="n">document</span><span class="p">[</span><span class="n">k</span><span class="p">]),</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;###############################################</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="s1">&#39;GOCC&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">graph</span><span class="o">.</span><span class="n">namespace_url</span><span class="p">:</span>
+        <span class="n">graph</span><span class="o">.</span><span class="n">namespace_url</span><span class="p">[</span><span class="s1">&#39;GOCC&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">GOCC_LATEST</span>
+
+    <span class="k">for</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">url</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">graph</span><span class="o">.</span><span class="n">namespace_url</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">0</span><span class="p">)):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;DEFINE NAMESPACE </span><span class="si">{}</span><span class="s1"> AS URL &quot;</span><span class="si">{}</span><span class="s1">&quot;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">namespace</span><span class="p">,</span> <span class="n">url</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">url</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">graph</span><span class="o">.</span><span class="n">namespace_owl</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">0</span><span class="p">)):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;DEFINE NAMESPACE </span><span class="si">{}</span><span class="s1"> AS OWL &quot;</span><span class="si">{}</span><span class="s1">&quot;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">namespace</span><span class="p">,</span> <span class="n">url</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;###############################################</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">annotation</span><span class="p">,</span> <span class="n">url</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">graph</span><span class="o">.</span><span class="n">annotation_url</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">0</span><span class="p">)):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;DEFINE ANNOTATION </span><span class="si">{}</span><span class="s1"> AS URL &quot;</span><span class="si">{}</span><span class="s1">&quot;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">annotation</span><span class="p">,</span> <span class="n">url</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">annotation</span><span class="p">,</span> <span class="n">an_list</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">graph</span><span class="o">.</span><span class="n">annotation_list</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">0</span><span class="p">)):</span>
+        <span class="n">an_list_str</span> <span class="o">=</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;&quot;</span><span class="si">{}</span><span class="s1">&quot;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">an_list</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;DEFINE ANNOTATION </span><span class="si">{}</span><span class="s1"> AS LIST {{</span><span class="si">{}</span><span class="s1">}}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">annotation</span><span class="p">,</span> <span class="n">an_list_str</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;###############################################</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+
+    <span class="c1"># sort by citation, then supporting text</span>
+    <span class="n">qualified_edges</span> <span class="o">=</span> <span class="nb">filter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">u_v_k_d</span><span class="p">:</span> <span class="s1">&#39;citation&#39;</span> <span class="ow">in</span> <span class="n">u_v_k_d</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="ow">and</span> <span class="s1">&#39;SupportingText&#39;</span> <span class="ow">in</span> <span class="n">u_v_k_d</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span>
+                             <span class="n">graph</span><span class="o">.</span><span class="n">edges_iter</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+    <span class="n">qualified_edges</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">qualified_edges</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">u_v_k_d</span><span class="p">:</span> <span class="n">sort_edges</span><span class="p">(</span><span class="n">u_v_k_d</span><span class="p">[</span><span class="mi">3</span><span class="p">]))</span>
+
+    <span class="k">for</span> <span class="n">citation</span><span class="p">,</span> <span class="n">citation_edges</span> <span class="ow">in</span> <span class="n">itt</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">qualified_edges</span><span class="p">,</span>
+                                                <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">u_v_k_d</span><span class="p">:</span> <span class="n">flatten_citation</span><span class="p">(</span><span class="n">u_v_k_d</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="s1">&#39;citation&#39;</span><span class="p">])):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;SET Citation = {{</span><span class="si">{}</span><span class="s1">}}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">citation</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">evidence</span><span class="p">,</span> <span class="n">evidence_edges</span> <span class="ow">in</span> <span class="n">itt</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">citation_edges</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">u_v_k_d</span><span class="p">:</span> <span class="n">u_v_k_d</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="s1">&#39;SupportingText&#39;</span><span class="p">]):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;SET SupportingText = &quot;</span><span class="si">{}</span><span class="s1">&quot;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">evidence</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">evidence_edges</span><span class="p">:</span>
+                <span class="n">dkeys</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">dk</span> <span class="k">for</span> <span class="n">dk</span> <span class="ow">in</span> <span class="n">d</span> <span class="k">if</span> <span class="n">dk</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">BLACKLIST_EDGE_ATTRIBUTES</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">dk</span> <span class="ow">in</span> <span class="n">dkeys</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;SET </span><span class="si">{}</span><span class="s1"> = &quot;</span><span class="si">{}</span><span class="s1">&quot;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">dk</span><span class="p">,</span> <span class="n">d</span><span class="p">[</span><span class="n">dk</span><span class="p">]),</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+                <span class="nb">print</span><span class="p">(</span><span class="n">decanonicalize_edge</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">k</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">dkeys</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;UNSET {{</span><span class="si">{}</span><span class="s1">}}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s1">&#39;&quot;</span><span class="si">{}</span><span class="s1">&quot;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">dk</span><span class="p">)</span> <span class="k">for</span> <span class="n">dk</span> <span class="ow">in</span> <span class="n">dkeys</span><span class="p">)),</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;UNSET SupportingText&#39;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;###############################################</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;SET Citation = {&quot;PyBEL&quot;,&quot;&quot;,&quot;&quot;}&#39;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;SET Evidence = &quot;Automatically added by PyBEL&quot;&#39;</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="n">graph</span><span class="o">.</span><span class="n">nodes_iter</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="s1">&#39;relation&#39;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">language</span><span class="o">.</span><span class="n">unqualified_edges</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">graph</span><span class="o">.</span><span class="n">adj</span><span class="p">[</span><span class="n">u</span><span class="p">]</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">graph</span><span class="o">.</span><span class="n">edge</span><span class="p">[</span><span class="n">u</span><span class="p">][</span><span class="n">v</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+            <span class="k">continue</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="n">decanonicalize_node</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="n">u</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span>
+
+    <span class="c1"># Can&#39;t infer hasMember relationships, but it&#39;s not due to specific evidence or citation</span>
+    <span class="k">for</span> <span class="n">u</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">graph</span><span class="o">.</span><span class="n">edges_iter</span><span class="p">(</span><span class="n">relation</span><span class="o">=</span><span class="s1">&#39;hasMember&#39;</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> hasMember </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">decanonicalize_node</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="n">u</span><span class="p">),</span> <span class="n">decanonicalize_node</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="n">v</span><span class="p">)),</span> <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Charles Tapley Hoyt.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.3.2',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

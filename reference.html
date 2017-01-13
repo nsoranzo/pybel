@@ -1,0 +1,872 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Reference &mdash; PyBEL 0.3.2 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
+    <link rel="top" title="PyBEL 0.3.2 documentation" href="index.html"/>
+        <link rel="next" title="Input and Output" href="io.html"/>
+        <link rel="prev" title="Cookbook" href="cookbook.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> PyBEL
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.3.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="datamodel.html">Data Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cookbook.html">Cookbook</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#parsers">Parsers</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#control-parser">Control Parser</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relation-parser">Relation Parser</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#metadata-parser">Metadata Parser</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#data-management">Data Management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#managers">Managers</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#utilities">Utilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#module-pybel.utils">General Utilities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-pybel.parser.utils">Parser Utilities</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="io.html">Input and Output</a></li>
+<li class="toctree-l1"><a class="reference internal" href="logging.html">Logging Messages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="roadmap.html">Roadmap</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="index.html">PyBEL</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html">Docs</a> &raquo;</li>
+      
+    <li>Reference</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/reference.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="reference">
+<h1>Reference<a class="headerlink" href="#reference" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="parsers">
+<h2>Parsers<a class="headerlink" href="#parsers" title="Permalink to this headline">¶</a></h2>
+<p>PyBEL makes extensive use of the PyParsing module. The code is organized to different modules to reflect
+the different faces ot the BEL language. These parsers support BEL 2.0 and have some backwards compatability
+for rewriting BEL 1.0 statements as BEL 2.0. The biologist and bioinformatician using this software will likely never
+need to read this page, but a developer seeking to extend the language will be interested to see the inner workings
+of these parsers.</p>
+<p>See: <a class="reference external" href="https://github.com/OpenBEL/language/blob/master/version_2.0/MIGRATE_BEL1_BEL2.md">https://github.com/OpenBEL/language/blob/master/version_2.0/MIGRATE_BEL1_BEL2.md</a></p>
+<div class="section" id="control-parser">
+<h3>Control Parser<a class="headerlink" href="#control-parser" title="Permalink to this headline">¶</a></h3>
+<p>This module handles parsing control statement, which add annotations and namespaces to the document.</p>
+<p>See: <a class="reference external" href="https://wiki.openbel.org/display/BLD/Control+Records">https://wiki.openbel.org/display/BLD/Control+Records</a></p>
+<dl class="class">
+<dt id="pybel.parser.parse_control.ControlParser">
+<em class="property">class </em><code class="descclassname">pybel.parser.parse_control.</code><code class="descname">ControlParser</code><span class="sig-paren">(</span><em>valid_annotations=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/parse_control.html#ControlParser"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.parse_control.ControlParser" title="Permalink to this definition">¶</a></dt>
+<dd><p>Builds parser for BEL valid_annotations statements</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>valid_annotations</strong> (<a class="reference external" href="https://docs.python.org/2/library/stdtypes.html#dict" title="(in Python v2.7)"><em>dict</em></a>) &#8211; A dictionary from {annotation: set of valid values} for parsing</td>
+</tr>
+</tbody>
+</table>
+<dl class="method">
+<dt id="pybel.parser.parse_control.ControlParser.get_annotations">
+<code class="descname">get_annotations</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/parse_control.html#ControlParser.get_annotations"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.parse_control.ControlParser.get_annotations" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">The currently stored BEL annotations</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><a class="reference external" href="https://docs.python.org/2/library/stdtypes.html#dict" title="(in Python v2.7)">dict</a></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="pybel.parser.parse_control.ControlParser.clear">
+<code class="descname">clear</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/parse_control.html#ControlParser.clear"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.parse_control.ControlParser.clear" title="Permalink to this definition">¶</a></dt>
+<dd><p>Clears the annotations, citation, and statement group</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="relation-parser">
+<h3>Relation Parser<a class="headerlink" href="#relation-parser" title="Permalink to this headline">¶</a></h3>
+<p>This module handles parsing BEL relations and validation of semantics.</p>
+<dl class="class">
+<dt id="pybel.parser.parse_bel.BelParser">
+<em class="property">class </em><code class="descclassname">pybel.parser.parse_bel.</code><code class="descname">BelParser</code><span class="sig-paren">(</span><em>graph=None</em>, <em>valid_namespaces=None</em>, <em>namespace_mapping=None</em>, <em>valid_annotations=None</em>, <em>lenient=False</em>, <em>complete_origin=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/parse_bel.html#BelParser"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.parse_bel.BelParser" title="Permalink to this definition">¶</a></dt>
+<dd><p>Build a parser backed by a given dictionary of namespaces</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>graph</strong> (<em>nx.MultiDiGraph</em>) &#8211; the graph to put the network in. Constructs new <code class="xref py py-class docutils literal"><span class="pre">nx.MultiDiGraph</span></code> if None</li>
+<li><strong>valid_namespaces</strong> (<a class="reference external" href="https://docs.python.org/2/library/stdtypes.html#dict" title="(in Python v2.7)"><em>dict</em></a>) &#8211; A dictionary of {namespace: set of members}</li>
+<li><strong>valid_annotations</strong> (<a class="reference external" href="https://docs.python.org/2/library/stdtypes.html#dict" title="(in Python v2.7)"><em>dict</em></a>) &#8211; a dict of {annotation: set of values}</li>
+<li><strong>namespace_mapping</strong> (<a class="reference external" href="https://docs.python.org/2/library/stdtypes.html#dict" title="(in Python v2.7)"><em>dict</em></a>) &#8211; a dict of {name: {value: (other_namepace, other_name)}}</li>
+<li><strong>lenient</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; if true, turn off naked namespace failures</li>
+<li><strong>complete_origin</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; if true, add the gene and RNA origin of proteins to the network during compilation</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.pmod">
+<code class="descname">pmod</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.pmod" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.2.1 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_protein_modifications">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_protein_modifications</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.variant">
+<code class="descname">variant</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.variant" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.2.2 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_variant_var">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_variant_var</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.fragment">
+<code class="descname">fragment</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.fragment" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.2.3 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_proteolytic_fragments">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_proteolytic_fragments</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.location">
+<code class="descname">location</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.location" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.2.4 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_cellular_location">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_cellular_location</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.psub">
+<code class="descname">psub</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.psub" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.2.X DEPRECATED
+<a class="reference external" href="http://openbel.org/language/web/version_1.0/bel_specification_version_1.0.html#_amino_acid_substitutions">http://openbel.org/language/web/version_1.0/bel_specification_version_1.0.html#_amino_acid_substitutions</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.gsub">
+<code class="descname">gsub</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.gsub" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.2.X DEPRECATED
+<a class="reference external" href="http://openbel.org/language/web/version_1.0/bel_specification_version_1.0.html#_sequence_variations">http://openbel.org/language/web/version_1.0/bel_specification_version_1.0.html#_sequence_variations</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.trunc">
+<code class="descname">trunc</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.trunc" title="Permalink to this definition">¶</a></dt>
+<dd><p>DEPRECATED
+<a class="reference external" href="http://openbel.org/language/web/version_1.0/bel_specification_version_1.0.html#_truncated_proteins">http://openbel.org/language/web/version_1.0/bel_specification_version_1.0.html#_truncated_proteins</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.gmod">
+<code class="descname">gmod</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.gmod" title="Permalink to this definition">¶</a></dt>
+<dd><p>PyBEL BEL Specification variant</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.fusion">
+<code class="descname">fusion</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.fusion" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.6.1 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_fusion_fus">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_fusion_fus</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.general_abundance">
+<code class="descname">general_abundance</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.general_abundance" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.1.1 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XcomplexA">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XcomplexA</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.gene">
+<code class="descname">gene</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.gene" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.1.4 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XgeneA">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XgeneA</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.mirna">
+<code class="descname">mirna</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.mirna" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.1.5 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XmicroRNAA">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XmicroRNAA</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.protein">
+<code class="descname">protein</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.protein" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.1.6 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XproteinA">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XproteinA</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.rna">
+<code class="descname">rna</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.rna" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.1.7 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XrnaA">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XrnaA</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.complex_singleton">
+<code class="descname">complex_singleton</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.complex_singleton" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.1.2 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XcomplexA">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XcomplexA</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.composite_abundance">
+<code class="descname">composite_abundance</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.composite_abundance" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.1.3 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XcompositeA">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XcompositeA</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.molecular_activity">
+<code class="descname">molecular_activity</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.molecular_activity" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.4.1 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XmolecularA">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XmolecularA</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.biological_process">
+<code class="descname">biological_process</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.biological_process" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.3.1 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_biologicalprocess_bp">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_biologicalprocess_bp</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.pathology">
+<code class="descname">pathology</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.pathology" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.3.2 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_pathology_path">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_pathology_path</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.activity">
+<code class="descname">activity</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.activity" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.3.3 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#Xactivity">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#Xactivity</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.translocation">
+<code class="descname">translocation</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.translocation" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.5.1 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_translocations">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_translocations</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.degradation">
+<code class="descname">degradation</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.degradation" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.5.2 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_degradation_deg">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_degradation_deg</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.reactants">
+<code class="descname">reactants</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.reactants" title="Permalink to this definition">¶</a></dt>
+<dd><p>2.5.3 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_reaction_rxn">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_reaction_rxn</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.increases_tag">
+<code class="descname">increases_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.increases_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.1.1 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#Xincreases">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#Xincreases</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.directly_increases_tag">
+<code class="descname">directly_increases_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.directly_increases_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.1.2 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XdIncreases">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XdIncreases</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.decreases_tag">
+<code class="descname">decreases_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.decreases_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.1.3 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#Xdecreases">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#Xdecreases</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.directly_decreases_tag">
+<code class="descname">directly_decreases_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.directly_decreases_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.1.4 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XdDecreases">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XdDecreases</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.analogous_tag">
+<code class="descname">analogous_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.analogous_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.5.1 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_analogous">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_analogous</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.causes_no_change_tag">
+<code class="descname">causes_no_change_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.causes_no_change_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.1.6 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#Xcnc">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#Xcnc</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.regulates_tag">
+<code class="descname">regulates_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.regulates_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.1.7 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_regulates_reg">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_regulates_reg</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.negative_correlation_tag">
+<code class="descname">negative_correlation_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.negative_correlation_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.2.1 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XnegCor">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XnegCor</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.positive_correlation_tag">
+<code class="descname">positive_correlation_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.positive_correlation_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.2.2 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XposCor">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#XposCor</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.association_tag">
+<code class="descname">association_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.association_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.2.3 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#Xassociation">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#Xassociation</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.orthologous_tag">
+<code class="descname">orthologous_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.orthologous_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.3.1 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_orthologous">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_orthologous</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.is_a_tag">
+<code class="descname">is_a_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.is_a_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.4.5 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_isa">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_isa</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.rate_limit_tag">
+<code class="descname">rate_limit_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.rate_limit_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.1.5 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_ratelimitingstepof">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_ratelimitingstepof</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.subprocess_of_tag">
+<code class="descname">subprocess_of_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.subprocess_of_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.4.6 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_subprocessof">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_subprocessof</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.transcribed_tag">
+<code class="descname">transcribed_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.transcribed_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.3.2 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_transcribedto">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_transcribedto</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.translated_tag">
+<code class="descname">translated_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.translated_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.3.3 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_translatedto">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_translatedto</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.has_member_tag">
+<code class="descname">has_member_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.has_member_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.4.1 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_hasmember">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_hasmember</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.abundance_list">
+<code class="descname">abundance_list</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.abundance_list" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.4.2 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_hasmembers">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_hasmembers</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.biomarker_tag">
+<code class="descname">biomarker_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.biomarker_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.5.2 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_biomarkerfor">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_biomarkerfor</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.prognostic_biomarker_tag">
+<code class="descname">prognostic_biomarker_tag</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.prognostic_biomarker_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.5.3 <a class="reference external" href="http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_prognosticbiomarkerfor">http://openbel.org/language/web/version_2.0/bel_specification_version_2.0.html#_prognosticbiomarkerfor</a></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pybel.parser.parse_bel.BelParser.causal_relation_tags">
+<code class="descname">causal_relation_tags</code><em class="property"> = None</em><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.causal_relation_tags" title="Permalink to this definition">¶</a></dt>
+<dd><p>3.1 Causal Relationships - nested. Explicitly not supported because of ambiguity</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pybel.parser.parse_bel.BelParser.get_language">
+<code class="descname">get_language</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/parse_bel.html#BelParser.get_language"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.get_language" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get language defined by this parser</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pybel.parser.parse_bel.BelParser.get_annotations">
+<code class="descname">get_annotations</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/parse_bel.html#BelParser.get_annotations"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.get_annotations" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get current annotations in this parser</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><a class="reference external" href="https://docs.python.org/2/library/stdtypes.html#dict" title="(in Python v2.7)">dict</a></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="pybel.parser.parse_bel.BelParser.clear">
+<code class="descname">clear</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/parse_bel.html#BelParser.clear"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.clear" title="Permalink to this definition">¶</a></dt>
+<dd><p>Clears the graph and all control parser data (current citation, annotations, and statement group)</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pybel.parser.parse_bel.BelParser.add_unqualified_edge">
+<code class="descname">add_unqualified_edge</code><span class="sig-paren">(</span><em>u</em>, <em>v</em>, <em>relation</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/parse_bel.html#BelParser.add_unqualified_edge"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.add_unqualified_edge" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds unique edge that has no annotations</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>u</strong> &#8211; source node</li>
+<li><strong>v</strong> &#8211; target node</li>
+<li><strong>relation</strong> &#8211; relationship label</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="pybel.parser.parse_bel.BelParser.ensure_node">
+<code class="descname">ensure_node</code><span class="sig-paren">(</span><em>s</em>, <em>l</em>, <em>tokens</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/parse_bel.html#BelParser.ensure_node"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.parse_bel.BelParser.ensure_node" title="Permalink to this definition">¶</a></dt>
+<dd><p>Turns parsed tokens into canonical node name and makes sure its in the graph</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">the canonical name of the node</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><a class="reference external" href="https://docs.python.org/2/library/functions.html#str" title="(in Python v2.7)">str</a></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="metadata-parser">
+<h3>Metadata Parser<a class="headerlink" href="#metadata-parser" title="Permalink to this headline">¶</a></h3>
+<p>This module supports the relation parser by handling statements.</p>
+<dl class="class">
+<dt id="pybel.parser.parse_metadata.MetadataParser">
+<em class="property">class </em><code class="descclassname">pybel.parser.parse_metadata.</code><code class="descname">MetadataParser</code><span class="sig-paren">(</span><em>cache_manager</em>, <em>valid_namespaces=None</em>, <em>valid_annotations=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/parse_metadata.html#MetadataParser"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.parse_metadata.MetadataParser" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>cache_manager</strong> (<em>pybel.manager.CacheManager</em>) &#8211; a namespace namespace_cache manager</li>
+<li><strong>valid_namespaces</strong> (<a class="reference external" href="https://docs.python.org/2/library/stdtypes.html#dict" title="(in Python v2.7)"><em>dict</em></a>) &#8211; dictionary of pre-loaded namespaces {name: set of valid values}</li>
+<li><strong>valid_annotations</strong> (<a class="reference external" href="https://docs.python.org/2/library/stdtypes.html#dict" title="(in Python v2.7)"><em>dict</em></a>) &#8211; dictionary of pre-loaded annotations {name: set of valid values}</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="data-management">
+<h2>Data Management<a class="headerlink" href="#data-management" title="Permalink to this headline">¶</a></h2>
+<p>Under the hood, PyBEL caches namespace and annotation files for quick recall on later use. The user doesn&#8217;t need to
+enable this option, but can specifiy a specific database location if they choose.</p>
+<div class="section" id="managers">
+<h3>Managers<a class="headerlink" href="#managers" title="Permalink to this headline">¶</a></h3>
+<dl class="method">
+<dt id="pybel.manager.cache.CacheManager.__init__">
+<code class="descclassname">CacheManager.</code><code class="descname">__init__</code><span class="sig-paren">(</span><em>connection=None</em>, <em>echo=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/manager/cache.html#CacheManager.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.manager.cache.CacheManager.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>The definition cache manager takes care of storing BEL namespace and annotation files for later use.
+It uses SQLite by default for speed and lightness, but any database can be used wiht its SQLAlchemy interface.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>connection</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#str" title="(in Python v2.7)"><em>str</em></a>) &#8211; custom database connection string</li>
+<li><strong>echo</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#bool" title="(in Python v2.7)"><em>bool</em></a>) &#8211; Whether or not echo the running sql code.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="utilities">
+<h2>Utilities<a class="headerlink" href="#utilities" title="Permalink to this headline">¶</a></h2>
+<p>Some utilities that are used throughout the software are explained here:</p>
+<div class="section" id="module-pybel.utils">
+<span id="general-utilities"></span><h3>General Utilities<a class="headerlink" href="#module-pybel.utils" title="Permalink to this headline">¶</a></h3>
+<dl class="function">
+<dt id="pybel.utils.download_url">
+<code class="descclassname">pybel.utils.</code><code class="descname">download_url</code><span class="sig-paren">(</span><em>url</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/utils.html#download_url"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.utils.download_url" title="Permalink to this definition">¶</a></dt>
+<dd><p>Downloads and parses a config file from url</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>url</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#str" title="(in Python v2.7)"><em>str</em></a>) &#8211; the URL of a BELNS, BELANNO, or BELEQ file to download and parse</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybel.utils.expand_dict">
+<code class="descclassname">pybel.utils.</code><code class="descname">expand_dict</code><span class="sig-paren">(</span><em>flat_dict</em>, <em>sep='_'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/utils.html#expand_dict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.utils.expand_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Expands a flattened dictionary
+:param flat_dict: a nested dictionary that has been flattened so the keys are composite
+:param sep: the seperator between concatenated keys</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybel.utils.flatten">
+<code class="descclassname">pybel.utils.</code><code class="descname">flatten</code><span class="sig-paren">(</span><em>d</em>, <em>parent_key=''</em>, <em>sep='_'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/utils.html#flatten"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.utils.flatten" title="Permalink to this definition">¶</a></dt>
+<dd><p>Flattens a nested dictionary</p>
+<p>Borrowed from <a class="reference external" href="http://stackoverflow.com/a/6027615">http://stackoverflow.com/a/6027615</a></p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybel.utils.flatten_graph_data">
+<code class="descclassname">pybel.utils.</code><code class="descname">flatten_graph_data</code><span class="sig-paren">(</span><em>graph</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/utils.html#flatten_graph_data"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.utils.flatten_graph_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a new graph with flattened edge data dictionaries</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>graph</strong> (<em>nx.MultiDiGraph</em>) &#8211; </td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">nx.MultiDiGraph</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="module-pybel.parser.utils">
+<span id="parser-utilities"></span><h3>Parser Utilities<a class="headerlink" href="#module-pybel.parser.utils" title="Permalink to this headline">¶</a></h3>
+<dl class="function">
+<dt id="pybel.parser.utils.sanitize_file_lines">
+<code class="descclassname">pybel.parser.utils.</code><code class="descname">sanitize_file_lines</code><span class="sig-paren">(</span><em>f</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/utils.html#sanitize_file_lines"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.utils.sanitize_file_lines" title="Permalink to this definition">¶</a></dt>
+<dd><p>Enumerates a line iterator and returns the pairs of (line number, line) that are cleaned</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybel.parser.utils.split_file_to_annotations_and_definitions">
+<code class="descclassname">pybel.parser.utils.</code><code class="descname">split_file_to_annotations_and_definitions</code><span class="sig-paren">(</span><em>file</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/utils.html#split_file_to_annotations_and_definitions"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.utils.split_file_to_annotations_and_definitions" title="Permalink to this definition">¶</a></dt>
+<dd><p>Enumerates a line iterable and splits into 3 parts</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybel.parser.utils.check_stability">
+<code class="descclassname">pybel.parser.utils.</code><code class="descname">check_stability</code><span class="sig-paren">(</span><em>ns_dict</em>, <em>ns_mapping</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/utils.html#check_stability"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.utils.check_stability" title="Permalink to this definition">¶</a></dt>
+<dd><p>Check the stability of namespace mapping</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>ns_dict</strong> &#8211; dict of {name: set of values}</li>
+<li><strong>ns_mapping</strong> &#8211; dict of {name: {value: (other_name, other_value)}}</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">if the mapping is stable</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">Boolean</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybel.parser.utils.list2tuple">
+<code class="descclassname">pybel.parser.utils.</code><code class="descname">list2tuple</code><span class="sig-paren">(</span><em>l</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/utils.html#list2tuple"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.utils.list2tuple" title="Permalink to this definition">¶</a></dt>
+<dd><p>turns a nested list to a nested tuple</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybel.parser.utils.subdict_matches">
+<code class="descclassname">pybel.parser.utils.</code><code class="descname">subdict_matches</code><span class="sig-paren">(</span><em>target_dict</em>, <em>query_dict</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/utils.html#subdict_matches"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.utils.subdict_matches" title="Permalink to this definition">¶</a></dt>
+<dd><p>Checks if all the keys in the query dict are in the target dict, and that their values match</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>target_dict</strong> (<a class="reference external" href="https://docs.python.org/2/library/stdtypes.html#dict" title="(in Python v2.7)"><em>dict</em></a>) &#8211; target_dict dictionary</li>
+<li><strong>query_dict</strong> (<a class="reference external" href="https://docs.python.org/2/library/stdtypes.html#dict" title="(in Python v2.7)"><em>dict</em></a>) &#8211; target_dict dictionary</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">if all keys in b are in target_dict and their values match</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference external" href="https://docs.python.org/2/library/functions.html#bool" title="(in Python v2.7)">bool</a></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybel.parser.utils.any_subdict_matches">
+<code class="descclassname">pybel.parser.utils.</code><code class="descname">any_subdict_matches</code><span class="sig-paren">(</span><em>dict_of_dicts</em>, <em>query_dict</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/utils.html#any_subdict_matches"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.utils.any_subdict_matches" title="Permalink to this definition">¶</a></dt>
+<dd><p>Checks if dictionary target_dict matches one of the subdictionaries of a</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>dict_of_dicts</strong> &#8211; dictionary of dictionaries</li>
+<li><strong>query_dict</strong> &#8211; dictionary</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">if dictionary target_dict matches one of the subdictionaries of a</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference external" href="https://docs.python.org/2/library/functions.html#bool" title="(in Python v2.7)">bool</a></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybel.parser.utils.cartesian_dictionary">
+<code class="descclassname">pybel.parser.utils.</code><code class="descname">cartesian_dictionary</code><span class="sig-paren">(</span><em>d</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/utils.html#cartesian_dictionary"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.utils.cartesian_dictionary" title="Permalink to this definition">¶</a></dt>
+<dd><p>takes a dictionary of sets and provides subdicts</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>d</strong> (<a class="reference external" href="https://docs.python.org/2/library/stdtypes.html#dict" title="(in Python v2.7)"><em>dict</em></a>) &#8211; a dictionary of sets</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><a class="reference external" href="https://docs.python.org/2/library/functions.html#list" title="(in Python v2.7)">list</a></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybel.parser.utils.handle_debug">
+<code class="descclassname">pybel.parser.utils.</code><code class="descname">handle_debug</code><span class="sig-paren">(</span><em>fmt</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/utils.html#handle_debug"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.utils.handle_debug" title="Permalink to this definition">¶</a></dt>
+<dd><p>logging hook for pyparsing</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>fmt</strong> &#8211; a format string with {s} for string, {l} for location, and {t} for tokens</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="pybel.parser.utils.ensure_quotes">
+<code class="descclassname">pybel.parser.utils.</code><code class="descname">ensure_quotes</code><span class="sig-paren">(</span><em>s</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/pybel/parser/utils.html#ensure_quotes"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#pybel.parser.utils.ensure_quotes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Quote a string that isn&#8217;t solely alphanumeric</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>s</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#str" title="(in Python v2.7)"><em>str</em></a>) &#8211; a string</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><a class="reference external" href="https://docs.python.org/2/library/functions.html#str" title="(in Python v2.7)">str</a></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="io.html" class="btn btn-neutral float-right" title="Input and Output" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="cookbook.html" class="btn btn-neutral" title="Cookbook" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Charles Tapley Hoyt.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.3.2',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
