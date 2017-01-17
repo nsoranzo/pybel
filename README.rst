@@ -41,13 +41,13 @@ Development |develop_build| |develop_coverage| |develop_documentation|
     :alt: Code Climate
 
 .. |python_versions| image:: https://img.shields.io/pypi/pyversions/PyBEL.svg
-    :alt: Stable Supported Python Versions
+:alt: Stable Supported Python Versions
 	
 .. |pypi_version| image:: https://img.shields.io/pypi/v/PyBEL.svg
-    :alt: Current version on PyPI
+:alt: Current version on PyPI
 
 .. |pypi_license| image:: https://img.shields.io/pypi/l/PyBEL.svg
-    :alt: Apache 2.0 License
+:alt: Apache 2.0 License
 
 
 Biological Expression Language (BEL) is a domain specific language that enables the expression of complex molecular

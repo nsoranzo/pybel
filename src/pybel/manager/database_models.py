@@ -23,6 +23,7 @@ EVIDENCE_TABLE_NAME = 'pybel_evidence'
 Base = declarative_base()
 
 
+# DONE
 class Definition(Base):
     """This table represents the metadata for a BEL Namespace or annotation"""
     __tablename__ = DEFINITION_TABLE_NAME
@@ -40,6 +41,7 @@ class Definition(Base):
     names = relationship("Name", cascade='delete, delete-orphan')
 
 
+# DONE
 class Name(Base):
     """This table represents the one-to-many relationship between a BEL Namespace/annotation, its values
     and their semantic annotations"""
@@ -53,6 +55,7 @@ class Name(Base):
     definition = relationship("Definition", back_populates='names')
 
 
+# DONE
 class AssociationNodeMod(Base):
     __tablename__ = NODE_MOD_TABLE_NAME
 
@@ -64,6 +67,7 @@ class AssociationNodeMod(Base):
     modification = relationship("Modification", back_populates="nodes")
 
 
+# DONE
 class Modification(Base):
     __tablename__ = MODIFICATION_TABLE_NAME
 
@@ -87,6 +91,7 @@ class Modification(Base):
     p5NameID = relationship("Name", foreign_keys=[p5Name_id])
 
 
+# DONE
 class Node(Base):
     __tablename__ = NODE_TABLE_NAME
 
@@ -100,6 +105,7 @@ class Node(Base):
     modifications = relationship("AssociationNodeMod", back_populates="node")
 
 
+#
 class AssociationEdgeGraph(Base):
     __tablename__ = EDGE_GRAPH_TABLE_NAME
 
@@ -111,6 +117,7 @@ class AssociationEdgeGraph(Base):
     edge = relationship("Edge", back_populates="graphs")
 
 
+# DONE
 class AssociationEdgeAnnotation(Base):
     __tablename__ = EDGE_ANNOTATIONS_TABLE_NAME
 
@@ -121,6 +128,7 @@ class AssociationEdgeAnnotation(Base):
     edge = relationship("Edge", back_populates="annotations")
 
 
+# DONE
 class AssociationEdgeProperty(Base):
     __tablename__ = EDGE_PROPERTIES_TABLE_NAME
 
@@ -131,6 +139,7 @@ class AssociationEdgeProperty(Base):
     edge = relationship("Edge", back_populates='attributes')
 
 
+# DONE
 class Edge(Base):
     __tablename__ = EDGE_TABLE_NAME
 
@@ -150,6 +159,7 @@ class Edge(Base):
     graphs = relationship("AssociationEdgeGraph", back_populates="edge")
 
 
+# DONE
 class Property(Base):
     __tablename__ = PROPERTY_TABLE_NAME
 
@@ -161,6 +171,7 @@ class Property(Base):
     name_id = Column(Integer, ForeignKey('{}.id'.format(NAME_TABLE_NAME)), nullable=True)
 
 
+# DONE
 class Citation(Base):
     __tablename__ = CITATION_TABLE_NAME
 
@@ -182,6 +193,7 @@ class Citation(Base):
     date = Column(Date, nullable=True)
 
 
+# DONE
 class Evidence(Base):
     __tablename__ = EVIDENCE_TABLE_NAME
 
@@ -191,6 +203,7 @@ class Evidence(Base):
     sha256 = Column(String(255), index=True)
 
 
+# DONE
 class Graphstore(Base):
     __tablename__ = GRAPH_TABLE_NAME
 

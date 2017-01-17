@@ -20,6 +20,13 @@ NETWORK_TABLE_NAME = 'pybel_network'
 OWL_TABLE_NAME = 'Owl'
 OWL_ENTRY_TABLE_NAME = 'OwlEntry'
 
+CITATION_TABLE_NAME = 'pybel_citation'
+EVIDENCE_TABLE_NAME = 'pybel_evidence'
+EDGE_PROPERTY_TABLE_NAME = 'pybel_edgeProperty'
+NODE_TABLE_NAME = 'pybel_node'
+MODIFICATION_TABLE_NAME = 'pybel_modification'
+EDGE_TABLE_NAME = 'pybel_edge'
+
 Base = declarative_base()
 
 NAMESPACE_DOMAIN_TYPES = {"BiologicalProcess", "Chemical", "Gene and Gene Products", "Other"}
@@ -74,6 +81,13 @@ class NamespaceEntry(Base):
         return 'NamespaceEntry({}, {})'.format(self.name, self.encoding)
 
 
+edge_annotations_relationship = Table(
+    'pybel_edge_annotations', Base.metadata,
+    Column('edge_id', Integer, ForeignKey(EDGE_TABLE_NAME + '.id')),
+    Column('annotation_id', Integer, ForeignKey(ANNOTATION_ENTRY_TABLE_NAME + '.id'))
+)
+
+
 class Annotation(Base):
     """This table represents the metadata for a BEL Namespace or annotation"""
     __tablename__ = ANNOTATION_TABLE_NAME
@@ -114,6 +128,12 @@ class AnnotationEntry(Base):
 
     annotation_id = Column(Integer, ForeignKey(ANNOTATION_TABLE_NAME + '.id'), index=True)
     annotation = relationship('Annotation', back_populates='entries')
+
+    edges = relationship(
+        "Edge",
+        secondary=edge_annotations_relationship,
+        back_populates="annotations"
+    )
 
     def __repr__(self):
         return 'AnnotationEntry({}, {})'.format(self.name, self.label)
@@ -177,4 +197,134 @@ class Network(Base):
 
     __table_args__ = (
         UniqueConstraint("name", "version"),
+    )
+
+
+class Citation(Base):
+    __tablename__ = CITATION_TABLE_NAME
+    id = Column(Integer, primary_key=True)
+
+    name = Column(String(255))
+    citationType = Column(String(100))
+    reference = Column(String(100))
+    comment = Column(Text, nullable=True)
+    journal = Column(Text, nullable=True)
+    volume = Column(String(255), nullable=True)
+    issue = Column(String(255), nullable=True)
+    pages = Column(String(255), nullable=True)
+    pmcId = Column(String(255), nullable=True)
+    firstauthor = Column(Text, nullable=True)
+    authors = Column(Text, nullable=True)
+    title = Column(Text, nullable=True)
+    pubdate = Column(Date, nullable=True)
+    lastauthor = Column(String(255), nullable=True, index=True)
+    date = Column(Date, nullable=True)
+
+
+class Evidence(Base):
+    __tablename__ = EVIDENCE_TABLE_NAME
+
+    id = Column(Integer, primary_key=True)
+    citation_id = Column(Integer, ForeignKey('{}.id'.format(CITATION_TABLE_NAME)))
+    supportingText = Column(Text)
+    sha256 = Column(String(255), index=True)
+
+
+edge_properties_relationship = Table(
+    'pybel_edge_properties', Base.metadata,
+    Column('edge_id', Integer, ForeignKey(EDGE_TABLE_NAME + '.id')),
+    Column('property_id', Integer, ForeignKey(EDGE_PROPERTY_TABLE_NAME + '.id'))
+)
+
+
+class EdgeProperty(Base):
+    __tablename__ = EDGE_PROPERTY_TABLE_NAME
+    id = Column(Integer, primary_key=True)
+
+    participant = Column(String(255))
+    modifier = Column(String(255))
+    relativeKey = Column(String(255), nullable=True)
+    propValue = Column(String(255), nullable=True)
+    name_id = Column(Integer, ForeignKey(NAMESPACE_ENTRY_TABLE_NAME + '.id'), nullable=True)
+
+    edges = relationship(
+        "Edge",
+        secondary=edge_properties_relationship,
+        back_populates="properties"
+    )
+
+
+node_modifications_relationship = Table(
+    'pybel_node_modifications', Base.metadata,
+    Column('node_id', Integer, ForeignKey(NODE_TABLE_NAME + '.id')),
+    Column('modification_id', Integer, ForeignKey(MODIFICATION_TABLE_NAME + '.id'))
+)
+
+
+class Node(Base):
+    __tablename__ = NODE_TABLE_NAME
+    id = Column(Integer, primary_key=True)
+
+    type = Column(String(255))
+    nodeIdentifier_id = Column(Integer, ForeignKey(NAMESPACE_ENTRY_TABLE_NAME + '.id'), nullable=True, index=True)
+    nodeKeyString = Column(String(255))
+    sha256 = Column(String(255), index=True)
+
+    modifications = relationship(
+        "Modification",
+        secondary=node_modifications_relationship,
+        back_populates="nodes")
+
+
+class Modification(Base):
+    __tablename__ = MODIFICATION_TABLE_NAME
+    id = Column(Integer, primary_key=True)
+
+    modType = Column(String(255))
+    variantString = Column(String(255), nullable=True)
+    pmodName_id = Column(ForeignKey(NAMESPACE_ENTRY_TABLE_NAME + '.id'), nullable=True, index=True)
+    p3Name_id = Column(ForeignKey(NAMESPACE_ENTRY_TABLE_NAME + '.id'), nullable=True, index=True)
+    p5Name_id = Column(ForeignKey(NAMESPACE_ENTRY_TABLE_NAME + '.id'), nullable=True, index=True)
+    p3Range = Column(String(255), nullable=True)
+    p5Range = Column(String(255), nullable=True)
+    pmodName = Column(String(255), nullable=True)
+    aminoA = Column(String(3), nullable=True)
+    aminoB = Column(String(3), nullable=True)
+    position = Column(Integer, nullable=True)
+
+    pmodNameID = relationship("NamespaceEntry", foreign_keys=[pmodName_id])
+    p3NameID = relationship("NamespaceEntry", foreign_keys=[p3Name_id])
+    p5NameID = relationship("NamespaceEntry", foreign_keys=[p5Name_id])
+
+    nodes = relationship(
+        "Node",
+        secondary=node_modifications_relationship,
+        back_populates="modifications"
+    )
+
+
+class Edge(Base):
+    __tablename__ = EDGE_TABLE_NAME
+    id = Column(Integer, primary_key=True)
+
+    subject_id = Column(Integer, ForeignKey(NODE_TABLE_NAME + '.id'), index=True)
+    relation = Column(String(50))
+    object_id = Column(Integer, ForeignKey(NODE_TABLE_NAME + '.id'), index=True)
+    citation_id = Column(Integer, ForeignKey(CITATION_TABLE_NAME + '.id'), nullable=True, index=True)
+    supportingText_id = Column(Integer, ForeignKey(EVIDENCE_TABLE_NAME + '.id'), nullable=True, index=True)
+    sha256 = Column(String(255), index=True)
+
+    subject = relationship("Node", foreign_keys=[subject_id])
+    object = relationship("Node", foreign_keys=[object_id])
+
+    properties = relationship(
+        "EdgeProperty",
+        secondary=edge_properties_relationship,
+        back_populates="edges"
+    )
+
+    annotations = relationship(
+        "AnnotationEntry",
+        secondary=edge_annotations_relationship,
+        back_populates="edges"
     )

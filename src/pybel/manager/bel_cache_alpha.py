@@ -21,6 +21,16 @@ log = logging.getLogger('pybel')
 
 class BelDataManager:
     def __init__(self, conn=None, definition_cache_manager=None, setup_default_cache=True, log_sql=False):
+        """
+        :param conn: Connection to database.
+        :type conn: Str / Connection
+        :param definition_cache_manager: Predefined DefinitionCacheManager.
+        :type definition_cache_manager: DefinitionCacheManager
+        :param setup_default_cache: Flag that identifies if a default_cache of the definitionsCacheManager should be setup.
+        :type setup_default_cache: Bool
+        :param log_sql: Flag that identifies if SQL statements should be logged.
+        :type log_sql: Bool
+        """
         conn = conn if conn is not None else 'sqlite:///' + defaults.DEFAULT_BEL_DATA_LOCATION
 
         self.definitionCacheManager = definition_cache_manager if definition_cache_manager else DefinitionCacheManager(
@@ -50,8 +60,19 @@ class BelDataManager:
 
     def setup_caches(self, node_cache=False, edge_cache=False, citation_cache=False, evidence_cache=False,
                      attribute_cache=False):
-        # ToDo: Check if a flag is needed so these would not be setup at instantiation but with flag (timesaving?)
-        """Initiates the caches of BelDataManager object so they will be available at initiation."""
+        """Creates caches of the BEL data in the relational database.
+
+        :param node_cache: Cache of all nodes in the database. Key: NodeHash, Value: NodeId
+        :type node_cache: Bool
+        :param edge_cache: Cache of all edges in the database. Key: edge.sha256, Value: EdgeId
+        :type edge_cache: Bool
+        :param citation_cache: Cache of all nodes in the database. Key: CitationType, Value: {referenceID:CitationID}
+        :type citation_cache: Bool
+        :param evidence_cache: Cache of all nodes in the database. Key: evidence.sha256, Value: EvidenceId
+        :type evidence_cache: Bool
+        :param attribute_cache: Cache of all nodes in the database. Key: PropertyKey, Value: {PropertyValue:PropertyId}
+        :type attribute_cache: Bool
+        """
 
         if citation_cache and len(self.cache['citation']) == 0:
             citation_dataframe = pd.read_sql_table(database_models.CITATION_TABLE_NAME, self.eng).groupby(
@@ -81,6 +102,7 @@ class BelDataManager:
             self.cache['node'] = {_pickle.loads(group.nodeHashTuple.values[0]): group.id.values[0] for nodeHash, group
                                   in node_dataframe}
 
+    # DONE
     def store_graph(self, pybel_graph, graph_label, graph_description=None, extract_information=True):
         """Stores PyBEL Graph object into given database.
 
@@ -111,6 +133,7 @@ class BelDataManager:
                 self.extract_information(pybel_graph, g_id)
             return True
 
+    # DONE
     def load_graph(self, graph_label):
         """Loads stored graph from relational database.
 
@@ -135,7 +158,18 @@ class BelDataManager:
 
     def store_node(self, nodeHash, node_data, namespace_dict, namespace_id_cache):
         """Stores Node into relational database.
-        Uses get_or_create() to either make a new entry in db or return existing one."""
+        Uses get_or_create() to either make a new entry in db or return existing one.
+
+        :param nodeHash: Tuple that is used as unique Key in the PyBEL Graph.
+        :type nodeHash: Tuple
+        :param node_data: Contains the node attributes.
+        :type node_data: Dict
+        :param namespace_dict: Dictionary that contains the mapping of namespace keyword to namespace url.
+        :type namespace_dict: Dict
+        :param namespace_id_cache: Dicitionary that contains name to id mapping of the relational database-entries for
+        the names defined by a namespace.
+        :type namespace_id_cache: Dict
+        """
         node_type = node_data['type']
         node_sha256 = hashlib.sha256(str(nodeHash).encode('utf-8')).hexdigest()
         node_dict = {
@@ -222,7 +256,7 @@ class BelDataManager:
         """Extracts BEL information from PyBEL Graph object and inserts it into relational database schema.
 
         :param pybel_graph: PyBEL Graph object that contains the information to store.
-        :type pybel_graph:
+        :type pybel_graph: PyBEL Graph
         :param graph_id: Identifier of PyBEL Graph stored in relational database.
         :type graph_id: int
         """
@@ -381,6 +415,7 @@ class BelDataManager:
 
         self.sesh.commit()
 
+    # DONE
     def show_stored_graphs(self):
         """Shows stored graphs in relational database."""
         stored_graph_label = self.sesh.query(database_models.Graphstore.label).all()
@@ -389,6 +424,15 @@ class BelDataManager:
     def get_or_create(self, database_model, insert_dict, discriminator_column=None, ignore_existing=False):
         """Method to insert a new instance into the relational database or to return the instance if it allready
         exists in database.
+
+        :param database_model: Database model defined in models.py
+        :type database_model: Database model
+        :param insert_dict: Dictionary with data that should be inserted into the relational database. Key: Column, Value: Data
+        :type insert_dict: Dict
+        :param discriminator_column: Column that should be used to discriminate datasets.
+        :type discriminator_column: Str
+        :param ignore_existing: Flag that identifies if existig etnries in the database should be ignored (multiple entries possible?).
+        :type ignore_existing: Bool
         """
         instance = None
         discriminator_dict = {
