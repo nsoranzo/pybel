@@ -366,9 +366,7 @@ class GraphCacheManager(BaseCacheManager):
             annotation_def = self.session.query(models.Annotation).filter_by(keyword=annotation_key).first()
             annotation = self.session.query(models.AnnotationEntry).filter_by(annotation=annotation_def,
                                                                               name=annotation_value).first()
-            # Add Annotations to belGraph.annotation_url
-            # Add Namespaces to belGraph.namespace_url
-            # What about meta information?
+
             edges = self.session.query(models.Edge).filter(models.Edge.annotations.contains(annotation)).all()
             for edge in edges:
                 edge_data = edge.forGraph()
@@ -397,21 +395,21 @@ class GraphCacheManager(BaseCacheManager):
         data = node_info['data']
         if node_object.type in ('Complex', 'Composite', 'List'):
             components = self.session.query(models.Edge).filter_by(source=node_object, relation='hasComponent').all()
-            for component in components:
-                component_key = component.target.old_forGraph()['key']
-                key.append(component_key)
+            component_keys = sorted(component.target.old_forGraph()['key'] for component in components)
+            [key.append(component_key) for component_key in component_keys]
 
         elif node_object.type == 'Reaction':
             reactant_components = self.session.query(models.Edge).filter_by(source=node_object,
                                                                             relation='hasReactant').all()
             product_components = self.session.query(models.Edge).filter_by(source=node_object,
                                                                            relation='hasProduct').all()
-            reactant_keys = tuple([reactant.target.old_forGraph()['key'] for reactant in reactant_components])
-            product_keys = tuple([product.target.old_forGraph()['key'] for product in product_components])
+            reactant_keys = tuple(sorted(reactant.target.old_forGraph()['key'] for reactant in reactant_components))
+            product_keys = tuple(sorted(product.target.old_forGraph()['key'] for product in product_components))
             key.append(reactant_keys)
             key.append(product_keys)
 
         return {'key': tuple(key), 'node': (tuple(key), data)}
+
 
 def to_database(graph, connection=None):
     """Stores a graph in a database

@@ -290,7 +290,7 @@ class Node(Base):
         if self.modification:
             node_data['variants'] = [modification.forGraph() for modification in self.modifications]
 
-        return (node_key, node_data)
+        return {'key': node_key, 'data': node_data}
 
 
 class Modification(Base):
@@ -407,7 +407,7 @@ class Citation(Base):
             'type': self.type
         }
         if self.authors:
-            citation_dict['authors'] = "|".join([author for author in self.authors])
+            citation_dict['authors'] = "|".join([author.name for author in self.authors])
         if self.date:
             citation_dict['date'] = self.date
         if self.comments:
