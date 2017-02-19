@@ -196,7 +196,7 @@ def ls(path):
     gcm = GraphCacheManager(connection=path)
 
     for row in gcm.ls():
-        click.echo(', '.join(map(str, row)))
+        click.echo('\t'.join(map(str, row)))
 
 
 @graph.command(help='Drops a graph by ID')

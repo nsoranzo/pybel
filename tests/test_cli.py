@@ -65,7 +65,9 @@ class TestCli(BelReconstitutionMixin, unittest.TestCase):
             neo = py2neo.Graph(neo_path)
             neo.data('match (n)-[r]->() where r.{}="{}" detach delete n'.format(PYBEL_CONTEXT_TAG, test_context))
         except py2neo.database.status.GraphError:
-            self.skipTest("Can't connect to neo4j")
+            self.skipTest("Can't query Neo4J ")
+        except:
+            self.skipTest("Can't connect to Neo4J server")
         else:
             self.runner.invoke(cli.main, ['convert', '--path', test_bel, '--neo',
                                           neo_path, '--neo-context', test_context, '--complete-origin'])

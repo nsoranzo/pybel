@@ -26,7 +26,7 @@ def to_database(graph, connection=None):
     """
     try:
         gcm = build_graph_cache_manager(connection)
-        gcm.insert_graph(graph)
+        return gcm.insert_graph(graph)
     except IntegrityError:
         log.exception('Error storing graph - other graph with same metadata'
                       ' already present. Consider incrementing the version')
