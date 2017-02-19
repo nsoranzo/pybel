@@ -141,6 +141,10 @@ class ControlParser(BaseParser):
         if values[0] == 'PubMed' and not is_int(values[2]):
             raise InvalidPubMedIdentifierWarning(values[2])
 
+        # TODO add check for date in proper format
+        # if 4 <= len(values) and not matches YYYY-MM-DD
+        # raise InvalidCitationDateWarning(values[3])
+
         self.citation = dict(zip(CITATION_ENTRIES, values))
 
         return tokens

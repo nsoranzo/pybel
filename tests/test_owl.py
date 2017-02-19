@@ -16,7 +16,6 @@ from tests.constants import test_bel_4, wine_iri, pizza_iri, test_owl_1, test_ow
 
 log = logging.getLogger('pybel')
 
-
 EXPECTED_PIZZA_NODES = {
     'Pizza',
     'Topping',
@@ -32,6 +31,7 @@ EXPECTED_PIZZA_EDGES = {
     ('MeatTopping', 'Topping'),
     ('TomatoTopping', 'Topping')
 }
+
 
 class TestOwlBase(unittest.TestCase):
     def assertHasNode(self, g, n, **kwargs):
@@ -442,9 +442,9 @@ class TestIntegration(TestOwlBase):
 
         annots = {
             CITATION: {
-                CITATION_NAME:'That one article from last week',
+                CITATION_NAME: 'That one article from last week',
                 CITATION_REFERENCE: '123455',
-                CITATION_TYPE:'PubMed'
+                CITATION_TYPE: 'PubMed'
             },
             EVIDENCE: 'Made up support, not even qualifying as evidence',
             ANNOTATIONS: {'Wine': 'Cotturi'}

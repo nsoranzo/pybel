@@ -105,7 +105,7 @@ def convert(path, url, database_name, database_connection, csv, graphml, json, p
         to_database(g)
 
     if store:
-        to_database(g, store)
+        to_database(g, connection=store)
 
     if neo:
         import py2neo

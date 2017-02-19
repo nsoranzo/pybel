@@ -4,6 +4,7 @@ import collections
 import logging
 from collections import defaultdict
 from configparser import ConfigParser
+from datetime import datetime
 
 import networkx as nx
 import requests
@@ -104,3 +105,26 @@ def flatten_graph_data(graph):
         g.add_edge(u, v, key=key, attr_dict=flatten_dict(data))
 
     return g
+
+
+CREATION_DATE_FMT = '%Y-%m-%dT%H:%M:%S'
+PUBLISHED_DATE_FMT = '%Y-%m-%d'
+PUBLISHED_DATE_FMT_2 = '%d:%m:%Y %H:%M'
+
+
+def parse_datetime(s):
+    """Tries to parse a datetime object from a standard datetime format or date format"""
+    # TODO rewrite as a for loop
+    try:
+        dt = datetime.strptime(s, CREATION_DATE_FMT)
+        return dt
+    except:
+        try:
+            dt = datetime.strptime(s, PUBLISHED_DATE_FMT)
+            return dt
+        except:
+            try:
+                dt = datetime.strptime(s, PUBLISHED_DATE_FMT_2)
+                return dt
+            except:
+                raise ValueError('Incorrect datetime format for {}'.format(s))

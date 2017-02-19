@@ -273,16 +273,18 @@ class BelReconstitutionMixin(unittest.TestCase):
         assertHasNode(self, FADD, g, **{FUNCTION: PROTEIN, NAMESPACE: 'HGNC', NAME: 'FADD'})
         assertHasNode(self, CASP8, g, **{FUNCTION: PROTEIN, NAMESPACE: 'HGNC', NAME: 'CASP8'})
 
-        citation_1 =  {
-          CITATION_NAME: "That one article from last week",
-          CITATION_REFERENCE: "123455",
-          CITATION_TYPE: "PubMed"
+        citation_1 = {
+            CITATION_NAME: "That one article from last week",
+            CITATION_REFERENCE: "123455",
+            CITATION_TYPE: "PubMed",
+            CITATION_AUTHORS: "Example Author|Example Author2",
+            CITATION_DATE: "2012-01-31",
         }
 
-        citation_2 =  {
-          CITATION_NAME: "That other article from last week",
-          CITATION_REFERENCE: "123456",
-          CITATION_TYPE: "PubMed"
+        citation_2 = {
+            CITATION_NAME: "That other article from last week",
+            CITATION_REFERENCE: "123456",
+            CITATION_TYPE: "PubMed"
         }
 
         evidence_1 = "Evidence 1 w extra notes"
