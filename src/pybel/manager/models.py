@@ -34,6 +34,7 @@ NODE_TABLE_NAME = 'pybel_node'
 EDGE_TABLE_NAME = 'pybel_edge'
 AUTHOR_TABLE_NAME = 'pybel_author'
 AUTHOR_CITATION_TABLE_NAME = 'pybel_author_citation'
+EDGE_ANNOTATION_TABLE_NAME = 'pybel_edge_annotationEntry'
 
 Base = declarative_base()
 
@@ -205,6 +206,12 @@ author_citation = Table(
     Column('citation_id', Integer, ForeignKey('{}.id'.format(CITATION_TABLE_NAME)))
 )
 
+edge_annotation = Table(
+    EDGE_ANNOTATION_TABLE_NAME, Base.metadata,
+    Column('edge_id', Integer, ForeignKey('{}.id'.format(EDGE_TABLE_NAME)), primary_key=True),
+    Column('annotationEntry_id', Integer, ForeignKey('{}.id'.format(ANNOTATION_ENTRY_TABLE_NAME)), primary_key=True)
+)
+
 
 class Network(Base):
     __tablename__ = NETWORK_TABLE_NAME
@@ -249,6 +256,8 @@ class Edge(Base):
 
     evidence_id = Column(Integer, ForeignKey('{}.id'.format(EVIDENCE_TABLE_NAME)))
     evidence = relationship("Evidence")
+
+    annotations = relationship('AnnotationEntry', secondary=edge_annotation)
 
     relation = Column(String, nullable=False)
     bel = Column(String, nullable=False)
